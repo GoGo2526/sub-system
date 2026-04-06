@@ -525,18 +525,23 @@ const INITIAL_RAW_DATA = {
                                                     <span className="text-2xl font-black">輸出 Excel 檔案</span>
                                                 </button>
 
-                                                <button 
-                                                    onClick={() => window.print()}
-                                                    className="flex-1 flex items-center justify-center gap-4 bg-slate-800 hover:bg-black text-white py-6 px-10 rounded-[2rem] shadow-lg shadow-slate-300/50 transition-all active:scale-[0.98] group"
-                                                >
-                                                    <Printer className="w-10 h-10 group-hover:-translate-y-1 transition-transform" />
-                                                    <span className="text-2xl font-black">列印代課通知單</span>
-                                                </button>
+                                                
+{/* 新增：連結「代課通知書」版面按鈕 (淺啡色) */}
+                    <a 
+                       href="http://www.ktgps-smr.edu.hk" 
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       className="flex-1 flex items-center justify-center gap-4 bg-[#A67C52] hover:bg-[#8B6543] text-white py-6 px-10 rounded-[2rem] shadow-lg shadow-slate-300/50 transition-all active:scale-[0.98] group"
+                    >
+                        <ExternalLink className="w-10 h-10 group-hover:scale-110 transition-transform" />
+                        <span className="text-2xl font-black">連結「代課通知書」版面</span>
+                    </a>
+
+
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                </div>
                         )}
                     </div>
                 </div>
