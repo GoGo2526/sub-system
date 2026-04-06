@@ -200,8 +200,78 @@
                 setLeaveReasons(prev => ({ ...prev, [key]: e.target.value }));
             };
 
+
+  /**
+   * 輸出 Excel 檔案邏輯
+   */
+  const handleExportExcel = () => {
+    const dateObj = displayDateInfo.dateRaw;
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    const fileName = `SUB-${dateStr}.csv`;
+    const procID = `SUB-${dateStr}`;
+
+    // 表頭
+    const headers = ["代課日期", "處理編號", "原任老師", "節數", "班別", "科目", "代課老師"];
+    const rows = [];
+
+    // 收集所有已安排的代課
+    Object.keys(assignments).forEach(key => {
+        const [dayId, lessonIdx, origTeacher] = key.split('-');
+        const subTeacher = assignments[key];
+        const slot = SCHEDULE_STRUCTURE[parseInt(lessonIdx)];
+        const schedule = getTeacherSchedule(origTeacher, dayId);
+        const content = schedule[parseInt(lessonIdx)];
+
+        let classCode = "", subject = "";
+        if (content.includes('/')) {
+            [classCode, subject] = content.split('/');
+        } else {
+            classCode = content;
+            subject = slot.id === 'HR' ? "班主任節" : slot.label;
+        }
+
+        rows.push([
+            displayDateInfo.dateString,
+            procID,
+            origTeacher,
+            slot.label,
+            classCode,
+            subject,
+            subTeacher
+        ]);
+    });
+
+    if (rows.length === 0) {
+        alert("尚未安排任何代課資料。");
+        return;
+    }
+
+    // 構建 CSV (帶 BOM 支援 Excel 中文)
+    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
+
             return (
                 <div className="min-h-screen bg-[#F0F2F5] text-slate-900 p-4 md:p-6 font-sans">
+
+                   {/* 移除 CSS 中的 @media print 邏輯與列印樣式 */}
+
+                   {/* Header section */}
+
                     <header className="max-w-7xl mx-auto mb-10 no-print space-y-6">
                         <div className="flex items-start gap-5">
                             <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3 shrink-0">
@@ -415,35 +485,38 @@
                                                 );
                                             })}
                                             
-                                            <div className="flex flex-col items-center md:items-start gap-4 px-4 md:px-10 py-8 md:py-12 mt-4 border-t border-slate-100 text-center md:text-left">
-                                                <div className="text-xl md:text-2xl font-black text-slate-800 flex flex-wrap items-center justify-center md:justify-start gap-2 leading-none">
-                                                    編排代課老師：<span className="hidden md:inline-block text-4xl font-light text-slate-400 ml-1">(</span>
-                                                    <span className="inline-block min-w-[150px] md:min-w-[200px] border-b-2 border-dotted border-slate-300 h-8"></span>
-                                                    <span className="hidden md:inline-block text-4xl font-light text-slate-400">)</span>
-                                                </div>
-                                                <div className="text-xl md:text-2xl font-black text-slate-800">日期：{currentFullDateTime}</div>
-                                            </div>
 
-                                            <div className="flex justify-center pt-8 no-print pb-10">
-                                                <button
-                                                    onClick={() => window.print()}
-                                                    className="group flex items-center gap-4 bg-blue-600 hover:bg-blue-700 text-white px-8 md:px-12 py-4 md:py-5 rounded-[1.5rem] md:rounded-[2rem] shadow-2xl transition-all hover:scale-105 active:scale-95"
-                                                >
-                                                    <Printer className="w-6 h-6 md:w-8 md:h-8 group-hover:animate-bounce" />
-                                                    <span className="text-xl md:text-2xl font-black tracking-widest">列印預覽</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+ {/* 底部功能按鈕區域 */}
+                <div className="flex flex-col md:flex-row gap-6 pt-10 mt-6 border-t-2 border-slate-100">
+                    <button 
+                        onClick={handleExportExcel}
+                        className="flex-1 flex items-center justify-center gap-4 bg-emerald-600 hover:bg-emerald-700 text-white py-6 px-10 rounded-[2rem] shadow-lg shadow-emerald-200/50 transition-all active:scale-[0.98] group"
+                    >
+                        <FileSpreadsheet className="w-10 h-10 group-hover:rotate-6 transition-transform" />
+                        <span className="text-2xl font-black">輸出 Excel 檔案</span>
+                    </button>
+
+                    <a 
+                        href="http://www.ktgps-smr.edu.hk" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-4 bg-slate-800 hover:bg-black text-white py-6 px-10 rounded-[2rem] shadow-lg shadow-slate-300/50 transition-all active:scale-[0.98] group"
+                    >
+                        <Printer className="w-10 h-10 group-hover:-translate-y-1 transition-transform" />
+                        <span className="text-2xl font-black">列印代課通知單</span>
+                    </a>
                 </div>
-            );
-        }
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+     
 
-        // 初始化 React 應用 - 確保使用 DOMContentLoaded 或直接在 Script 結束前執行
+   // 初始化 React 應用 - 確保使用 DOMContentLoaded 或直接在 Script 結束前執行
         const initApp = () => {
             const container = document.getElementById('root');
             if (container) {
