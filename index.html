@@ -26,7 +26,17 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect } = React;
+       // 修正 1: 安全地獲取 React Hooks
+    const useState = React.useState;
+    const useMemo = React.useMemo;
+    const useEffect = React.useEffect;
+
+// 修正 2: 手動定義 Lucide 組件，確保在 React 中可用
+    const ExternalLink = (props) => <i data-lucide="external-link" {...props}></i>;
+    const FileSpreadsheet = (props) => <i data-lucide="file-spreadsheet" {...props}></i>;
+    const Printer = (props) => <i data-lucide="printer" {...props}></i>;
+    const Trash2 = (props) => <i data-lucide="trash-2" {...props}></i>;
+    const UserPlus = (props) => <i data-lucide="user-plus" {...props}></i>;
 
 const INITIAL_RAW_DATA = {
   "mon": [
@@ -112,13 +122,18 @@ const INITIAL_RAW_DATA = {
         const MAROON_TEACHERS = ["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"];
         const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
 
-        function App() {
-            const getIcon = (name) => {
-                if (typeof lucideReact !== 'undefined' && lucideReact[name]) {
-                    return lucideReact[name];
-                }
-                return () => null;
-            };
+       function App() {
+        // 在 App 渲染後初始化 Lucide 圖示
+        useEffect(() => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }, []);
+// ... 其餘邏輯保持完全一致 ...
+        
+        // 修正 3: 確保按鈕內的圖示使用正確的組件名稱
+        // 將原本的 <ExternalLink ... /> 保持不變，但我們會透過 useEffect 讓它生效
+    }
 
             const User = getIcon('User');
             const Calendar = getIcon('Calendar');
