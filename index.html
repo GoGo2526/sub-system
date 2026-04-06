@@ -220,7 +220,7 @@
                                     onChange={(e) => { setSelectedTeacher(e.target.value); setSubRequest(null); }}
                                     className="pl-11 pr-10 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black hover:border-blue-600 outline-none transition-all cursor-pointer appearance-none w-full shadow-sm text-black"
                                 >
-                                    <option value="" disabled>教師代號...</option>
+                                    <option value="" disabled>請選擇缺席教師...</option>
                                     {teachersList.map((t, idx) => (
                                         <option key={`${t}-${idx}`} value={t} className={getTeacherTextColor(t)}>{t}</option>
                                     ))}
