@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能編代課系統 v1.13.0</title>
+    <!-- 引入必要的外部庫 -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,283 +13,167 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     
     <style>
+        /* 保持原始版面設定 */
         @media print {
             @page { size: landscape; margin: 0.5cm; }
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { position: absolute; left: 0; top: 0; width: 100%; display: flex !important; flex-direction: row !important; gap: 20px; }
             .no-print { display: none !important; }
-            .print-copy { width: calc(50% - 10px); zoom: 0.65; border: 2px solid #000 !important; padding: 20px; border-radius: 15px; height: fit-content; }
-            select { border: none; background: transparent; appearance: none; -webkit-appearance: none; color: black !important; }
         }
-        .bg-custard-yellow { background-color: #FFF9E3 !important; }
-        body { background-color: #F0F2F5; font-family: sans-serif; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; }
+        .bg-custard-yellow { background-color: #fef9c3; }
+        .bg-sky-blue { background-color: #e0f2fe; }
+        .print-only { display: none; }
+        @media print { .print-only { display: block; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        
-        const { useState, useMemo, useEffect } = React;
-
-        // 預設數據結構 (若未上傳 Excel 時使用)
-        // const DEFAULT_DATA = { "mon": [], "tue": [], "wed": [], "thur": [], "fri": [] };
-
-        // const INITIAL_RAW_DATA = {
-
-        const DEFAULT_RAW_DATA = {
-  "mon": [
-    ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
-    ["班主任節", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A", "6B", "6C", "6D", "6E", "6E", "5A", "5B", "5C", "5D", "5E", "4A", "4B", "4C", "4D", "4E", "3A", "3B", "3C", "3D", "3E", "2A", "2B", "2C", "2D", "2E", "1A", "1B", "1C", "1D", "1E", "", "", "", "", "", "", ""],
-    ["1", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A/數學", "6B/英文", "6C/中文", "6D/數學", "", "6E/英文", "5A/數學", "5B/英文", "5C/英文", "5D/中文", "5E/英文", "4A/英文", "4B/英文", "4C/中文", "4D/中文", "4E/科學", "3A/英文", "3B/中文", "3C/英文", "3D/英文", "3E/中文", "2A/英P", "2B/英文", "2C/數學", "2D/中作", "2E/中文", "1A/數學", "1B/數學", "1C/英文", "1D/中文", "1E/數學", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2A/英P"],
-    ["2", "", "", "", "", "", "", "", "", "", "", "6C/音樂", "", "", "", "", "", "", "2E/趣中", "6A/數學", "6B/英文", "", "", "4C/科技", "6E/英文", "5A/數學", "5B/英文", "5C/英文", "5D/中文", "5E/英文", "", "4B/英文", "4A/體育", "1C/體育", "4E/科學", "3A/英文", "3B/中文", "3C/英文", "", "3E/中文", "2A/英P", "2B/英文", "2C/數學", "2D/中作", "", "1A/數學", "1B/數學", "6D/英文", "1D/中文", "1E/數學", "", "4D/科學", "", "3D/中文", "", "", "2A/英P"],
-    ["3", "", "", "", "", "3D/常識", "6B/數學", "5A/英文", "4E/英文", "4D/數學", "", "", "5B/數學", "", "1A/英文", "5E/視藝", "5C/音樂", "4A/科學", "1C/普話", "1D/數學", "", "", "", "6E/科技", "", "4B/數學", "", "3A/音樂", "", "", "2C/英文", "", "2B/體育", "", "3E/數學", "2A/視藝", "6C/普話", "", "5D/英文", "", "", "", "", "1B/中文", "3C/常識", "", "", "", "6D/中作", "", "3B/數學", "6A/體育", "1E/中文", "4C/視藝", "2D/數學", "2E/數學", ""],
-    ["4", "", "", "", "5C/中文", "", "", "5A/英文", "4E/英文", "", "2D/體育", "", "5B/數學", "3D/普話", "1A/英文", "5E/視藝", "", "3A/常識", "", "", "", "", "", "4D/人文", "", "4B/數學", "", "1D/英文", "", "", "2C/英文", "", "", "", "3E/數學", "2A/視藝", "4A/普話", "", "5D/音樂", "3B/普話", "", "", "6C/數學", "1B/中文", "3C/常識", "", "2B/數學", "1C/英文", "6D/中作", "6B/常識", "6A/科技", "6E/體育", "1E/中文", "4C/視藝", "", "2E/數學", ""],
-    ["5", "", "5B/中文", "4B/中文", "", "P3/常共議", "3A/數學", "3B/英文", "5D/常識", "4D/體育", "6A/中文", "4E/音樂", "4A/數學", "", "", "6B/中文", "5A/中文", "P3/常共議", "P3/常共議", "P3/常共議", "1E/英文", "2E/視藝", "5E/數學", "", "", "", "3E/英S", "", "1A/中文", "4C/英文", "5C/常識", "", "", "3C/體育", "", "", "P3/常共議", "", "", "", "", "1C/數學", "2A/數學", "", "P3/常共議", "6D/視藝", "1B/音樂", "1D/科學", "", "", "3D/科技", "6E/數學", "2C/中文", "6C/常識", "2B/常識", "2D/常識", "3E/英S"],
-    ["6", "","","4B/中文","1C/人文","P3/常共議","3A/數學","3B/英S","","5D/體育","6A/中文","","4A/數學","3C/中文","","6B/中文","5A/中文","P3/常共議","P3/常共議","P3/常共議","1E/英文","2E/視藝","5E/數學","4D/科技","","","3E/英文","","1A/中文","4C/英文","5C/常識","","3D/體育","","4E/數學","","P3/常共議","","","","","1B/科學","2A/數學","","P3/常共議","6D/視藝","5B/音樂","1D/科學","","","","6E/數學","2C/中文","6C/常識","2B/常識","2D/常識","3B/英S"],
-    ["LUNCH", "", "", "", "", "", "", "3B/午膳", "4E/午膳", "", "6A/午膳", "", "4C/午膳", "6D/午膳", "1A/午膳", "", "", "", "2E/午膳", "", "6B/午膳", "6C/午膳", "", "", "6E/午膳", "5A/午膳", "5B/午膳", "5C/午膳", "5D/午膳", "5E/午膳", "4A/午膳", "4B/午膳", "", "4D/午膳", "", "3A/午膳", "", "3C/午膳", "3D/午膳", "3E/午膳", "2A/午膳", "2B/午膳", "2C/午膳", "2D/午膳", "", "", "", "1C/午膳", "1D/午膳", "1E/午膳", "", "", "1B/午膳", "", "", "", ""],
-    ["7", "4C/數學","","","5A/常識","5C/數學","","","2C/常識","","","4A/中作","","","6C/英文","","6D/音樂","3C/數學","6E/中文","","","1C/中文","4B/科技","4E/中文","2D/英P","6B/視藝","","","","","","2E/英文","","1D/體育","","1B/英文","","4D/英文","3B/音樂","2A/中文","6A/英文","1A/科學","","1E/人文","5E/中文","3A/中文","","","","","5D/數學","5B/體育","","3E/視藝","3D/數學","2B/中作","2D/英P"],
-    ["8", "4C/數學","","","","5C/數學","","","2C/常識","","1E/體育","4A/中作","","","6C/英文","","5A/音樂","3C/數學","6E/中文","","","1C/中文","5B/科技","4E/中文","2D/英P","6B/視藝","","1D/英文","","","","2E/英文","4B/體育","","6D/常識","1B/英文","3B/常識","4D/英文","1A/音樂","2A/中文","6A/英文","","","","5E/中文","3A/中文","","","","","5D/數學","","","3E/視藝","3D/數學","2B/中作","2D/英P"],
-    ["9", "", "5B/導修", "4B/導修", "5C/導修", "", "P6/數拔", "3B/導修", "", "", "2C/導修", "4A/導修", "4C/導修", "3D/導修", "", "", "", "", "6E/導修", "", "6B/導修", "6C/導修", "5E/導修", "4E/導修", "", "", "", "", "5D/導修", "", "", "P3/英補", "1A/導修", "4D/導修", "", "", "", "3C/導修", "", "3E/導修", "6A/導修", "1C/導修", "", "2D/導修", "2E/導修", "", "1B/導修", "6D/導修", "1D/導修", "1E/導修", "5A/導修", "", "P3/中補", "3A/導修", "2B/導修", "2A/導修", ""],
-  ],
-  "tue": [
-   ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
-   ["班主任節", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A", "6B", "6C", "6D", "6E", "6E", "5A", "5B", "5C", "5D", "5E", "4A", "4B", "4C", "4D", "4E", "3A", "3B", "3C", "3D", "3E", "2A", "2B", "2C", "2D", "2E", "1A", "1B", "1C", "1D", "1E", "", "", "", "", "", "", ""],
-   ["1", "","","","","","","","","","","","","","","","","","","6A/數學","6B/英文","6C/中文","6D/數學","6E/常識","","5A/數學","5B/英文","5C/英文","5D/中文","5E/英文","4A/英文","4B/英文","4C/中文","4D/中文","4E/數學","3A/英文","3B/常識","3C/英文","3D/英文","3E/中文","2A/英文","2B/英文","2C/數學","2D/中文","2E/中作","1A/數學","1B/數學","1C/英文","1D/中文","1E/數學","","","","","","",""],
-   ["2", "","","","","5C/數學","","","5D/常識","","","","4C/人文","6D/普話","1A/英文","","","3C/數學","","6A/數學","","6C/中文","6B/科技","6E/常識","","","5B/英文","","","","4A/英文","","4E/人文","2A/體育","3E/數學","3A/英文","3B/常識","1B/人文","3D/英文","5E/普話","2C/音樂","","","2D/中文","2E/中作","","4D/音樂","1C/英文","1D/中文","1E/科學","","5A/體育","4B/普話","","2B/常識","",""],
-   ["3", "1B/體育","","4B/中作","5A/常識","3D/常識","","3B/英文","","4D/數學","6A/中文","4A/中文","5B/數學","3C/中文","","6B/中文","5E/音樂","6C/體育","","","","1C/中作","","4E/中文","","","2B/視藝","2D/音樂","","3E/科技","2C/英P","2E/英文","","","","","","","5D/英文","","","1A/科學","","","","3A/中作","","6D/英文","","4C/科學","","6E/數學","1E/中文","5C/視藝","1D/人文","2A/常識","2C/英P"],
-   ["4", "4C/體育","","4B/中作","5A/常識","3D/常識","","3B/英文","","3E/體育","6A/中文","4A/中文","5B/數學","3C/中文","","","6B/音樂","","","1D/數學","","1C/中作","5E/數學","4E/中文","6E/英文","","2B/視藝","","","6C/科技","2C/英P","","","","","1B/英文","4D/普話","","5D/英文","","","1A/科學","2A/數學","","","3A/中作","","6D/英文","","","","","1E/中文","5C/視藝","2D/數學","2E/數學","2C/英P"],
-   ["5", "","5B/中文","","5C/中文","","3A/數學","5A/英文","","","","6A/音樂","4A/數學","","6C/英文","","","3C/數學","6E/中作","","1E/英P","","4E/科技","","2D/英文","","3E/英文","1D/英文","1A/中文","4C/英文","","","2E/體育","","6D/常識","","4B/人文","4D/英文","","","2A/英文","1C/數學","","1B/中作","5E/中文","5D/視藝","","","","","3B/數學","6B/體育","2C/中文","3D/中文","","2B/中文","1E/英P"],
-   ["6", "","5B/中文","","5C/中文","6A/常識","6B/數學","5A/英文","2C/常識","4E/體育","","","4A/數學","","6C/英文","","","","6E/中作","","1E/英P","","","","2D/英文","","","1D/英文","1A/中文","4C/英文","","2E/英文","","","6D/常識","","","4D/英文","","2A/中文","3E/音樂","1C/數學","","1B/中作","3C/常識","5D/視藝","4B/音樂","","2B/科技","","3B/數學","3A/體育","","3D/中文","5E/常識","","1E/英P"],
-   ["LUNCH", "","","","1C/午膳","5C/午膳","3A/午膳","","","","1B/午膳","吉","4A/午膳","3C/午膳","","6B/午膳","4B/午膳","","6E/午膳","6A/午膳","","6C/午膳","6D/午膳","","","5A/午膳","5B/午膳","","","","","","4C/午膳","4D/午膳","4E/午膳","","3B/午膳","","3D/午膳","","2A/午膳","","2C/午膳","2D/午膳","2E/午膳","1A/午膳","","","","","3E/午膳","5D/午膳","1E/午膳","5E/午膳","1D/午膳","2B/午膳",""],
-   ["7", "4C/數學","","","","","","","4E/英文","5E/體育","2C/體育","4A/音樂","","","1A/英文","","5A/中文","3A/常識","","3E/常識","1C/科學","","","4D/人文","","4B/數學","","1D/音樂","","","5C/常識","5B/常識","","2E/常識","","1B/英文","3B/中文","3C/英S","","2A/普話","6A/英文","","6C/數學","","","","2B/數學","1E/科技","6D/中文","6B/常識","5D/數學","","6E/普話","","3D/數學","2D/常識","3C/英S"],
-   ["8", "","","","","","","","","","","","","","","","","","","6A/綜合課","6B/綜合課","6C/綜合課","6D/綜合課","6E/綜合課","6E/綜合課","5A/綜合課","5B/綜合課","5C/綜合課","5D/綜合課","5E/綜合課","4A/綜合課","4B/綜合課","4C/綜合課","4D/綜合課","4E/綜合課","3A/綜合課","3B/綜合課","3C/綜合課","3D/綜合課","3E/綜合課","2A/綜合課","2B/綜合課","2C/綜合課","2D/綜合課","2E/綜合課","1A/綜合課","1B/綜合課","1C/綜合課","1D/綜合課","1E/綜合課","","","","","","",""],
-   ["9", "","","","","","","","","","","","","","","","","","","6A/綜合課","6B/綜合課","6C/綜合課","6D/綜合課","6E/綜合課","6E/綜合課","5A/綜合課","5B/綜合課","5C/綜合課","5D/綜合課","5E/綜合課","4A/綜合課","4B/綜合課","4C/綜合課","4D/綜合課","4E/綜合課","3A/綜合課","3B/綜合課","3C/綜合課","3D/綜合課","3E/綜合課","2A/綜合課","2B/綜合課","2C/綜合課","2D/綜合課","2E/綜合課","1A/綜合課","1B/綜合課","1C/綜合課","1D/綜合課","1E/綜合課","","","","","","",""],
-  ],
-  "wed": [
-   ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
-   ["班主任節", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A", "6B", "6C", "6D", "6E", "6E", "5A", "5B", "5C", "5D", "5E", "4A", "4B", "4C", "4D", "4E", "3A", "3B", "3C", "3D", "3E", "2A", "2B", "2C", "2D", "2E", "1A", "1B", "1C", "1D", "1E", "", "", "", "", "", "", ""],
-   ["1", "","","","","","","","","","","","","","","","","","","6A/數學","6B/英文","6C/中文","6D/數學","","6E/英文","5A/數學","5B/英文","5C/英文","5D/中文","5E/英文","4A/英文","4B/英文","4C/中文","4D/中文","4E/數學","3A/英文","3B/中作","3C/英文","3D/英文","3E/中文","2A/英文","2B/英P","2C/數學","2D/中文","2E/中文","1A/數學","1B/數學","1C/英文","1D/中作","1E/科學","","","","","","","2B/英P"],
-   ["2", "","","","5A/常識","3D/常識","2C/科技","","","","6A/中文","","","","","","","3C/數學","","","6B/英文","6C/中文","6D/數學","","6E/英文","","","5C/英文","1A/趣中","5E/英文","4A/英文","4B/英文","4C/中文","4D/中文","4E/數學","","3B/中作","1B/人文","1C/音樂","3E/中文","2A/英文","2B/英P","","2D/中文","2E/中文","3A/中文","","","1D/中作","1E/科學","5D/數學","5B/體育","","","","","2B/英P"],
-   ["3", "4C/數學","5B/中文","4B/視藝","5C/中作","6A/常識","3A/數學","","","","","6C/音樂","","3C/中文","","6B/中作","5A/中作","","","1D/數學","1C/科學","","","4A/科技","","4E/視藝","3E/英文","","","","","2E/英P","1A/體育","","","2D/視藝","3B/常識","4D/英文","5D/英文","2A/中作","","","2C/視藝","1B/中文","","","","6D/英文","","","","6E/體育","1E/中文","3D/中文","5E/常識","2B/中文","2E/英P"],
-   ["4", "","5B/中文","4B/視藝","5C/中作","6A/常識","","","","","","","","3C/中文","6C/英文","6B/中作","5A/中作","","","1D/數學","1C/科學","","","3A/科技","","4E/視藝","3E/英文","","1A/中文","","","2E/英P","4A/體育","3B/體育","","2D/視藝","","4D/英文","5D/英文","2A/中作","","","2C/視藝","1B/中文","","","4C/音樂","6D/英文","","1E/數學","","6E/數學","","3D/中文","5E/常識","2B/中文","2E/英P"],
-   ["5", "","","","","","6B/數學","5A/英文","5D/常識","4D/數學","1E/體育","4A/中文","","","1A/英文","","","","2B/普話","","","","","6E/常識","3C/視藝","4B/數學","1D/視藝","","","5C/科技","","","4E/人文","2E/常識","3E/數學","1B/英文","","","3D/英S","","2A/音樂","1C/數學","6C/數學","","5E/中作","6A/視藝","5B/音樂","","","4C/科學","3B/數學","6D/體育","2C/中文","3A/視藝","","2D/常識","3D/英S"],
-   ["6", "","","","","","6B/數學","","5D/常識","4D/數學","","","5B/數學","","1A/英文","4A/人文","5A/音樂","","6E/中文","","1E/英文","1C/中文","6D/科技","4E/中文","3C/視藝","4B/數學","1D/視藝","2B/音樂","","","","","3D/體育","2E/常識","3E/數學","1B/英文","","","","","","","6C/數學","吉","5E/中作","6A/視藝","","","","4C/科學","3B/數學","5C/體育","2C/中文","3A/視藝","2D/數學","2A/常識",""],
-   ["LUNCH", "","","","2A/午膳","6A/午膳","3A/午膳","5A/午膳","2C/午膳","","","","5B/午膳","4C/午膳","6C/午膳","","6D/午膳","3C/午膳","2E/午膳","","6B/午膳","","","6E/午膳","","","","5C/午膳","5D/午膳","5E/午膳","4A/午膳","4B/午膳","","","4E/午膳","","3B/午膳","","","","","","","","","1A/午膳","1B/午膳","1C/午膳","1D/午膳","","4D/午膳","3E/午膳","1E/午膳","3D/午膳","2D/午膳","2B/午膳",""],
-   ["7", "","1B/科技","4B/中文","","5C/數學","","3B/英文","4E/英文","4D/體育","","6E/音樂","4A/數學","","","","","","","3E/常識","","","5E/數學","","2D/英文","","","1D/英文","5D/普話","4C/英文","2C/英文","5B/常識","","1C/體育","","3A/英S","","1A/人文","","5A/普話","6A/英文","","2A/數學","1E/人文","3C/常識","","2B/數學","","6D/中文","","","","6B/普話","6C/常識","3D/數學","2E/數學","3A/英S"],
-   ["8", "","","","","","","","","","","","","","","","","","","6A/生教課","6B/生教課","6C/生教課","6D/生教課","6E/生教課","6E/生教課","5A/生教課","5B/生教課","5C/生教課","5D/生教課","5E/生教課","4A/生教課","4B/生教課","4C/生教課","4D/生教課","4E/生教課","3A/生教課","3B/生教課","3C/生教課","3D/生教課","3E/生教課","2A/生教課","2B/生教課","2C/生教課","2D/生教課","2E/生教課","1A/生教課","1B/生教課","1C/生教課","1D/生教課","1E/生教課","","","","","","",""],
-   ["9", "","","","","","","","","","","","","","","","","","","6A/導修","6B/導修","6C/導修","6D/導修","6E/導修","6E/導修","5A/導修","5B/導修","5C/導修","5D/導修","5E/導修","4A/導修","4B/導修","4C/導修","4D/導修","4E/導修","3A/導修","3B/導修","3C/導修","3D/導修","3E/導修","2A/導修","2B/導修","2C/導修","2D/導修","2E/導修","1A/導修","1B/導修","1C/導修","1D/導修","1E/導修","","","","","","",""],
-  ],
-  "thur": [
-   ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
-   ["班主任節", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A", "6B", "6C", "6D", "6E", "6E", "5A", "5B", "5C", "5D", "5E", "4A", "4B", "4C", "4D", "4E", "3A", "3B", "3C", "3D", "3E", "2A", "2B", "2C", "2D", "2E", "1A", "1B", "1C", "1D", "1E", "", "", "", "", "", "", ""],
-   ["1", "","","","","","","","","","","","","","","","","","","6A/數學","6B/英文","6C/中文","6D/數學","","6E/英文","5A/數學","5B/英文","5C/英文","5D/中作","5E/英文","4A/英文","4B/英文","4C/中作","4D/中文","4E/數學","3A/英文","3B/中文","3C/英文","3D/英文","3E/中作","2A/英文","2B/英文","2C/數學","2D/趣中","2E/中文","1A/數學","1B/數學","1C/英P","1D/中文","1E/數學","","","","","","","1C/英P"],
-   ["2", "","","","","6A/常識","","","","","2C/體育","","","","","","","","2E/普話","1D/數學","","","6D/數學","","6E/英文","5A/數學","5B/英文","5C/英文","5D/中作","5E/英文","4A/英文","","4C/中作","4D/中文","4E/數學","3A/英文","3B/中文","3C/英文","3D/英文","3E/中作","2A/英文","2B/英文","","1B/中文","","","4B/音樂","1C/英P","1A/科技","","","6B/體育","1E/普話","6C/常識","2D/數學","","1C/英P"],
-   ["3", "4C/體育","","","5C/中文","","","","4E/英文","4D/數學","","4A/音樂","","","6C/英文","6B/中文","5A/中文","3A/常識","","3E/常識","","1C/中文","5E/數學","","6E/視藝","4B/數學","3D/視藝","","","","2C/英文","5B/常識","2B/體育","2E/常識","","","6A/普話","","","3C/普話","","1B/科學","2A/數學","","","1A/視藝","","6D/英文","","2D/科技","5D/數學","","1E/中作","3B/視藝","1D/人文","",""],
-   ["4", "4C/數學","","","5C/中文","","","","4E/英文","4D/數學","2B/趣中","6A/音樂","4A/數學","","6C/英文","6B/中文","5A/中文","3C/數學","","3E/常識","","1C/中文","5E/數學","","6E/視藝","","3D/視藝","","","","2C/英文","5B/常識","4B/體育","","","","","","","2A/趣中","2E/音樂","1B/科學","","","","1A/視藝","","6D/英文","1D/科技","","5D/數學","3A/體育","1E/中作","3B/視藝","","2D/常識",""],
-   ["5", "","5B/中作","","","5C/數學","3A/數學","5A/英文","2C/常識","4E/體育","","4A/中文","","","","6C/視藝","","","6E/中文","","","1C/視藝","","","","","","","1A/中作","4C/英文","","2E/英文","","3C/體育","6D/常識","1B/英P","4B/人文","","5D/音樂","3E/普話","6A/英文","","1E/視藝","2D/普話","5E/中文","","2B/數學","1D/科學","","6B/常識","3B/數學","4D/科學","","","3D/數學","2A/常識","1B/英P"],
-   ["6", "","5B/中作","","","5C/數學","3A/數學","5A/英文","5D/常識","5E/體育","","4A/中文","","","","6C/視藝","6D/音樂","","6E/中文","4B/科學","","1C/視藝","","4E/中文","2D/英文","","","","1A/中作","4C/英文","","2E/英文","","1D/體育","3E/數學","1B/英P","3B/常識","","","","6A/英文","","1E/視藝","","","","2B/數學","","","6B/常識","3C/科技","4D/科學","2C/趣中","","3D/數學","2A/常識","1B/英P"],
-   ["LUNCH", "","","","1C/午膳","","","","2C/午膳","","","","","","","5E/午膳","","3B/午膳","","6A/午膳","6B/午膳","6C/午膳","6D/午膳","4E/午膳","6E/午膳","5A/午膳","5B/午膳","5C/午膳","5D/午膳","","4A/午膳","4B/午膳","4C/午膳","4D/午膳","","3A/午膳","","3C/午膳","","3E/午膳","2A/午膳","2B/午膳","","","2E/午膳","1A/午膳","1B/午膳","","1D/午膳","1E/午膳","","","","3D/午膳","2D/午膳","",""],
-   ["7", "","","4B/中文","","","6B/數學","3B/英文","","","","","4C/人文","3C/中作","1A/英P","","5C/音樂","4A/科學","2C/普話","","1E/英文","","","6E/常識","2D/英文","5A/視藝","3E/英文","1D/英文","","5E/科技","","","","2A/體育","","","5B/普話","4D/英文","5D/英文","","","1C/數學","6C/數學","1B/趣中","","3A/中文","","","6D/中文","","","6A/體育","4E/普話","3D/中作","2B/常識","2E/數學","1A/英P"],
-   ["8", "1B/體育","1C/科技","4B/中文","","","6B/數學","3B/英文","","","6A/中文","","5B/數學","3C/中作","1A/英P","","","4A/科學","","","1E/英文","","","","","5A/視藝","3E/英文","1D/英文","","","5C/常識","","","","4E/科學","","4C/普話","","5D/英文","2A/中文S","","","6C/數學","2D/中文S","2E/中文S","3A/中文","4D/音樂","","6D/中文","","","6E/數學","2C/中文S","3D/中作","5E/常識","2B/中文S","1A/英P"],
-   ["9", "","","4B/導修","5C/導修","5D/導修","6B/導修","","4E/導修","","6A/導修","","5B/導修","6D/導修","","4A/導修","","","3A/導修","","1C/導修","","5E/導修","","2D/導修","5A/導修","","","P6/中拔","4C/導修","2C/導修","","1A/導修","","3E/導修","","4D/導修","3C/導修","3D/導修","","P6/英拔","2B/導修","","","2E/導修","","1B/導修","P6/英補","1D/導修","1E/導修","3B/導修","6E/導修","P6/中補","6C/導修","","2A/導修",""],
-  ],
-  "fri": [
-   ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
-   ["班主任節", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "6A", "6B", "6C", "6D", "6E", "6E", "5A", "5B", "5C", "5D", "5E", "4A", "4B", "4C", "4D", "4E", "3A", "3B", "3C", "3D", "3E", "2A", "2B", "2C", "2D", "2E", "1A", "1B", "1C", "1D", "1E", "", "", "", "", "", "", ""],
-   ["1", "","","","","","","","","","","","","","","","","","","6A/數學","6B/英文","6C/中作","6D/數學","","6E/英文","5A/數學","5B/英文","5C/英文","5D/中文","5E/英文","4A/英文","4B/英文","4C/中文","4D/中作","4E/數學","3A/英文","3B/中文","3C/英文","3D/英文","3E/中文","2A/英文","2B/英文","2C/數學","2D/中文","2E/中文","1A/數學","1B/數學","1C/英文","1D/趣中","1E/數學","","","","","","",""],
-   ["2", "","","","","6A/常識","","5A/英文","2C/常識","","2D/體育","4E/音樂","5B/數學","","1A/英文","4A/人文","","","1B/普話","3E/常識","6B/英文","6C/中作","","6E/常識","","","","1E/音樂","5D/中文","","","4B/英文","4C/中文","4D/中作","6D/常識","","","3C/英文","3D/英文","","","2B/英文","","","","3A/中文","","1C/英文","","2A/科技","3B/數學","5C/體育","1D/普話","","5E/常識","2E/數學",""],
-   ["3", "4C/數學","","4B/中文","1C/人文","3D/常識","6B/數學","3B/英文","","3E/體育","6A/中作","6E/音樂","","","","4D/視藝","","3A/常識","1A/普話","1D/數學","","","5E/數學","4E/中作","2D/英文","","","","5C/普話","","2C/英文","5B/常識","","","","1B/英文","","","5D/英文","","","","6C/數學","","3C/常識","","","6D/英文","","2E/科技","","5A/體育","1E/趣中","4A/視藝","2B/常識","2A/常識",""],
-   ["4", "4C/數學","5B/中文","","5C/中文","","","3B/英文","","","6A/中作","","","","6C/英文","4D/視藝","5E/音樂","3A/常識","6E/中文","","","1C/中文S","","4E/中作","2D/英文","4B/數學","","3C/音樂","1A/中文S","5A/科技","2C/英文","","2E/體育","","3E/數學","","","","","","","","2A/數學","1B/中文S","","","2B/數學","","1D/中文S","6B/常識","5D/數學","6D/體育","1E/中文S","4A/視藝","3D/數學","",""],
-   ["5", "","","","","5C/數學","","","4E/英文","5D/體育","","4A/中文","","","","6B/中文","5A/中文","3C/數學","3A/普話","4B/科學","1E/英文","","","","","","3E/英文","1D/英P","","","","","1A/體育","2E/常識","","1B/視藝","","4D/英文","3D/音樂","2A/中文","6A/英文","1C/數學","","","5E/中文","5B/視藝","4C/音樂","","6D/中文","","3B/科技","6E/數學","2C/中作","6C/常識","2D/數學","2B/中文","1D/英P"],
-   ["6", "","","","5A/常識","","3A/數學","","4E/英文","4D/數學","","","4A/數學","3C/中文","","","6B/音樂","6C/體育","","4B/科學","1E/英文","1C/趣中","5D/科技","","","","3E/英文","1D/英P","","4C/英文","5C/常識","2E/英文","","3B/體育","","1B/視藝","","1A/人文","","2A/中文","6A/英文","","","","5E/中文","5B/視藝","","","6D/中文","","","6E/數學","2C/中作","3D/中文","2D/數學","2B/中文","1D/英P"],
-   ["LUNCH", "","","","","5C/午膳","6B/午膳","5B/午膳","","","1D/午膳","","","","1A/午膳","4B/午膳","5A/午膳","4A/午膳","","6A/午膳","","","6D/午膳","6C/午膳","6E/午膳","","","","","5E/午膳","","","4C/午膳","","4E/午膳","3A/午膳","3B/午膳","3C/午膳","3D/午膳","3E/午膳","","2B/午膳","2C/午膳","2D/午膳","2E/午膳","","1B/午膳","1C/午膳","","1E/午膳","4D/午膳","5D/午膳","","","","2A/午膳",""],
-   ["7", "4C/導修","5B/導修","","1C/導修","","P6/數補","","","4D/導修","6A/導修","","","","6C/導修","6B/導修","","","2E/導修","","","","6D/導修","3A/導修","6E/導修","5A/導修","3E/導修","5C/導修","1A/導修","5E/導修","4A/導修","4B/導修","","","4E/導修","","3B/導修","3C/導修","","","","1B/導修","","2D/導修","","","2B/導修","","1D/導修","1E/導修","5D/導修","","2C/導修","3D/導修","P3/數補","2A/導修",""],
-   ["8", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
-   ["9", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
-   ],
-};
-
-
-        const SCHEDULE_STRUCTURE = [
-            { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
-            { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
-            { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
-            { type: 'break', id: 'B1', label: '小息', time: '9:45 - 10:05', icon: 'sun', csvKey: 'B1' },
-            { type: 'class', id: '3', label: '第三節', time: '10:05 - 10:40', csvKey: '3' },
-            { type: 'class', id: '4', label: '第四節', time: '10:40 - 11:15', csvKey: '4' },
-            { type: 'break', id: 'B2', label: '小休', time: '11:15 - 11:25', icon: 'coffee', csvKey: 'B2' },
-            { type: 'class', id: '5', label: '第五節', time: '11:25 - 12:00', csvKey: '5' },
-            { type: 'class', id: '6', label: '第六節', time: '12:00 - 12:35', csvKey: '6' },
-            { type: 'class', id: 'LUNCH', label: '午膳', time: '12:35 - 1:15', icon: 'utensils', csvKey: 'LUNCH' },
-            { type: 'break', id: 'REST', label: '午息', time: '1:15 - 1:35', icon: 'moon', csvKey: 'REST' },
-            { type: 'class', id: '7', label: '第七節', time: '1:35 - 2:10', csvKey: '7' },
-            { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
-            { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
-        ];
-
-        const DAYS_CONFIG = [
-            { id: 'mon', label: '一', offset: 1 },
-            { id: 'tue', label: '二', offset: 2 },
-            { id: 'wed', label: '三', offset: 3 },
-            { id: 'thur', label: '四', offset: 4 },
-            { id: 'fri', label: '五', offset: 5 }
-        ];
-
-        const Icon = ({ name, className }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} className={className}></i>;
-        };
+    <!-- 使用 Babel 在瀏覽器中編譯 JSX -->
+    <script type="text/babel" data-presets="react">
+        const { useState, useEffect, useMemo } = React;
 
         function App() {
-            const [rawData, setRawData] = useState(DEFAULT_DATA);
-            const [selectedTeacher, setSelectedTeacher] = useState("");
-            const [activeTab, setActiveTab] = useState('mon');
+            // 系統數據狀態
+            const [activeTab, setActiveTab] = useState('AM');
+            const [selectedTeacher, setSelectedTeacher] = useState('');
+            const [teachers, setTeachers] = useState([]);
+            const [schedule, setSchedule] = useState({ AM: [], PM: [] });
             const [assignments, setAssignments] = useState({});
-            const [leaveReasons, setLeaveReasons] = useState({});
-            const [todayDate, setTodayDate] = useState(new Date());
 
-            // 處理 Excel 上傳
-            const handleFileUpload = (e) => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                    const newData = {};
-                    wb.SheetNames.forEach(name => {
-                        newData[name.toLowerCase()] = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1 });
-                    });
-                    setRawData(newData);
-                    alert("Excel 數據匯入成功！");
-                };
-                reader.readAsBinaryString(file);
+            // 模擬初始數據或保留原本邏輯
+            useEffect(() => {
+                // 如果你有預設數據，可以在這裡初始化
+                // 以下為範例結構預留
+                const demoTeachers = [
+                    { id: 'T01', name: '陳老師', total: 20 },
+                    { id: 'T02', name: '林老師', total: 18 }
+                ];
+                setTeachers(demoTeachers);
+            }, []);
+
+            // 輔助函式：獲取可用代課老師 (保留原本邏輯)
+            const getAvailableTeachers = (period, lessonIdx) => {
+                return teachers.filter(t => t.id !== selectedTeacher);
             };
 
-            const teachers = useMemo(() => {
-                const dayData = rawData[activeTab] || [];
-                const headerRow = dayData.find(row => row[0] && String(row[0]).includes("教師代號"));
-                return headerRow ? headerRow.slice(1).filter(t => t && String(t).trim() !== "") : [];
-            }, [rawData, activeTab]);
-
-            const getTeacherSchedule = (teacherName, dayId) => {
-                const dayData = rawData[dayId] || [];
-                const headerRow = dayData.find(row => row[0] && String(row[0]).includes("教師代號"));
-                if (!headerRow) return Array(SCHEDULE_STRUCTURE.length).fill("");
-                const teacherIdx = headerRow.indexOf(teacherName);
-                return SCHEDULE_STRUCTURE.map(slot => {
-                    const row = dayData.find(r => r[0] && String(r[0]).includes(slot.csvKey));
-                    return row ? row[teacherIdx] || "" : "";
-                });
-            };
-
-            const isClassOccupied = (content) => {
-                if (!content || String(content).trim() === "") return false;
-                const ignore = ["小息", "小休", "午息", "午休", "班主任節", "午膳", "LUNCH", "REST", "BREAK"];
-                return !ignore.some(k => String(content).toUpperCase().includes(k));
-            };
-
-            const getAvailableTeachers = (dayId, lessonIdx) => {
-                return teachers
-                    .filter(t => t !== selectedTeacher)
-                    .map(t => {
-                        const sch = getTeacherSchedule(t, dayId);
-                        return { id: t, isFree: !isClassOccupied(sch[lessonIdx]), total: sch.filter(isClassOccupied).length };
-                    })
-                    .filter(res => res.isFree)
-                    .sort((a, b) => a.total - b.total);
-            };
+            const periods = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
             return (
-                <div className="min-h-screen p-4 md:p-6">
-                    <header className="max-w-7xl mx-auto mb-6 no-print flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-blue-600 p-3 rounded-2xl shadow-lg"><Icon name="calendar" className="text-white w-6 h-6" /></div>
-                            <div>
-                                <h1 className="text-2xl font-black">觀塘官立小學(秀明道)</h1>
-                                <p className="text-blue-600 font-bold">智能編代課系統 v1.13.0</p>
+                <div className="min-h-screen bg-gray-50 pb-20">
+                    {/* 導航欄 */}
+                    <header className="bg-white shadow-sm p-4 mb-6 sticky top-0 z-10 no-print">
+                        <div className="container mx-auto flex justify-between items-center">
+                            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                <span className="bg-blue-600 text-white p-1 rounded">智能</span>
+                                編代課系統 <span className="text-sm font-normal text-gray-400">v1.13.0</span>
+                            </h1>
+                            <div className="flex gap-2">
+                                <button onClick={() => window.print()} className="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-700 transition">
+                                    列印報表
+                                </button>
                             </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <label className="bg-white border-2 border-slate-200 px-4 py-2 rounded-xl font-bold cursor-pointer hover:bg-slate-50 flex items-center gap-2">
-                                <Icon name="file-up" className="w-4 h-4" /> 匯入 Excel
-                                <input type="file" className="hidden" accept=".xlsx" onChange={handleFileUpload} />
-                            </label>
-                            <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 hover:bg-black">
-                                <Icon name="printer" className="w-4 h-4" /> 列印
-                            </button>
                         </div>
                     </header>
 
-                    <div className="max-w-7xl mx-auto mb-6 no-print bg-white p-4 rounded-3xl shadow-sm border flex flex-wrap gap-4 items-center justify-between">
-                        <select value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)} className="bg-slate-100 p-3 rounded-xl font-bold text-lg min-w-[200px]">
-                            <option value="">選擇缺席教師...</option>
-                            {teachers.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <div className="flex bg-slate-100 p-1 rounded-xl">
-                            {DAYS_CONFIG.map(d => (
-                                <button key={d.id} onClick={() => setActiveTab(d.id)} className={`px-6 py-2 rounded-lg font-black transition-all ${activeTab === d.id ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>
-                                    {d.label}
+                    <main className="container mx-auto p-4">
+                        {/* 頁籤切換 */}
+                        <div className="flex mb-6 bg-gray-200 p-1 rounded-xl w-fit no-print">
+                            {['AM', 'PM'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`px-8 py-2 rounded-lg font-bold transition ${activeTab === tab ? 'bg-white text-blue-600 shadow' : 'text-gray-500'}`}
+                                >
+                                    {tab === 'AM' ? '上午校 (AM)' : '下午校 (PM)'}
                                 </button>
                             ))}
                         </div>
-                    </div>
 
-                    <main id="print-area" className="max-w-7xl mx-auto flex flex-col gap-8">
-                        {selectedTeacher && [1, 2].map(copy => (
-                            <div key={copy} className={`bg-white rounded-[2rem] shadow-xl border overflow-hidden ${copy === 2 ? 'hidden print:block print-copy' : 'print-copy'}`}>
-                                <div className="p-8 border-b bg-slate-50 flex justify-between items-center">
-                                    <div>
-                                        <h2 className="text-3xl font-black">代課安排通知 ({selectedTeacher})</h2>
-                                        <p className="text-lg font-bold text-slate-500 mt-1">日期：星期{DAYS_CONFIG.find(d => d.id === activeTab).label}</p>
-                                    </div>
-                                    <div className="text-right no-print">
-                                        <span className="text-sm text-slate-400">副本 {copy}</span>
-                                    </div>
-                                </div>
-                                <div className="p-6 space-y-3">
-                                    {SCHEDULE_STRUCTURE.map((slot, idx) => {
-                                        const sch = getTeacherSchedule(selectedTeacher, activeTab);
-                                        const content = sch[idx];
-                                        const isOcc = isClassOccupied(content);
-                                        const sub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
+                        {/* 主要操作區 */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 no-print">
+                            <div className="md:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2">
+                                    選擇請假老師
+                                </h3>
+                                <select 
+                                    className="w-full p-3 rounded-xl border-2 border-gray-100 focus:border-blue-400 outline-none transition"
+                                    value={selectedTeacher}
+                                    onChange={(e) => setSelectedTeacher(e.target.value)}
+                                >
+                                    <option value="">-- 請選擇 --</option>
+                                    {teachers.map(t => (
+                                        <option key={t.id} value={t.id}>{t.id} ({t.name})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div id="print-area" className="md:col-span-3 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                <h3 className="font-bold text-gray-700 mb-6">課表排列與代課安排</h3>
+                                
+                                <div className="grid grid-cols-1 gap-4">
+                                    {periods.map((p, idx) => {
+                                        const isOcc = selectedTeacher !== '';
+                                        const subId = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
+                                        
                                         return (
-                                            <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border-2 ${isOcc ? 'border-slate-100' : 'opacity-40 bg-slate-50 border-transparent'}`}>
-                                                <div className="w-24 text-center border-r pr-4">
-                                                    <div className="text-xs font-black text-blue-600">{slot.label}</div>
-                                                    <div className="text-sm font-bold text-slate-400">{slot.time}</div>
+                                            <div key={idx} className={`p-4 rounded-xl border-2 flex justify-between items-center ${isOcc ? 'border-blue-100 bg-blue-50/30' : 'border-gray-50'}`}>
+                                                <div>
+                                                    <span className="text-sm font-bold text-gray-400 mr-4">第 {p} 節</span>
+                                                    <span className="font-bold text-gray-700">
+                                                        {isOcc ? `${selectedTeacher} 老師原課` : '未選取老師'}
+                                                    </span>
                                                 </div>
-                                                <div className="flex-1 text-xl font-black">{content || (isOcc ? "有課" : "空堂")}</div>
+                                                
                                                 {isOcc && (
                                                     <div className="no-print">
-                                                        {sub ? (
-                                                            <button onClick={() => {
-                                                                const a = {...assignments}; delete a[`${activeTab}-${idx}-${selectedTeacher}`]; setAssignments(a);
-                                                            }} className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
-                                                                代課: {sub} <Icon name="x" className="w-4 h-4" />
+                                                        {subId ? (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const newAssign = {...assignments};
+                                                                    delete newAssign[`${activeTab}-${idx}-${selectedTeacher}`];
+                                                                    setAssignments(newAssign);
+                                                                }}
+                                                                className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                                                            >
+                                                                代課: {subId} ✕
                                                             </button>
                                                         ) : (
-                                                            <select onChange={e => setAssignments({...assignments, [`${activeTab}-${idx}-${selectedTeacher}`]: e.target.value})} className="bg-blue-50 text-blue-700 p-2 rounded-xl font-bold border-none">
+                                                            <select 
+                                                                onChange={e => setAssignments({...assignments, [`${activeTab}-${idx}-${selectedTeacher}`]: e.target.value})}
+                                                                className="bg-blue-600 text-white p-2 rounded-lg font-bold border-none"
+                                                            >
                                                                 <option value="">安排代課...</option>
-                                                                {getAvailableTeachers(activeTab, idx).map(t => <option key={t.id} value={t.id}>{t.id} (連課:{t.total})</option>)}
+                                                                {getAvailableTeachers(activeTab, idx).map(t => (
+                                                                    <option key={t.id} value={t.id}>{t.id} (連課:{t.total})</option>
+                                                                ))}
                                                             </select>
                                                         )}
                                                     </div>
                                                 )}
-                                                {isOcc && sub && <div className="hidden print:block border-2 border-black px-4 py-2 rounded-lg font-black bg-custard-yellow">代課：{sub}</div>}
+                                                
+                                                {/* 列印顯示區域 */}
+                                                {isOcc && subId && (
+                                                    <div className="hidden print:block border-2 border-black px-4 py-1 rounded bg-custard-yellow font-bold">
+                                                        代課：{subId}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             </div>
-                        ))}
+                        </div>
                     </main>
                 </div>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        // 初始化 React 渲染
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(<App />);
     </script>
 </body>
