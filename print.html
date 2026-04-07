@@ -75,8 +75,9 @@
             font-weight: bold;
         }
 
+        /* 修改標頭底色為深灰色 */
         th {
-            background-color: #9ca3af;
+            background-color: #9ca3af; /* Tailwind gray-400 */
         }
 
         .import-btn {
@@ -109,18 +110,21 @@
             .page-container {
                 box-shadow: none;
                 border: none;
-                padding: 1.5cm;
+                padding: 1.5cm; /* 第一頁內容的基礎邊距 */
                 max-width: 100%;
             }
+            /* 強制分頁後的樣式 */
             .page-break {
                 page-break-before: always;
                 border: none;
                 margin: 0;
                 height: 0;
             }
+            /* 當需要分頁時，為第二頁頂部預留與第一頁相同的距離 */
             .second-page-padding {
                 padding-top: 1.5cm;
             }
+            
             .copy-divider {
                 border-top: 1px solid #000;
             }
@@ -147,11 +151,14 @@
 </div>
 
 <div class="page-container" id="mainContent">
+    <!-- 這裡會由 JS 生成兩份副本 -->
     <div id="noticesWrapper"></div>
+    <!-- 隱藏的測量容器 -->
     <div id="measureContainer" style="position: absolute; visibility: hidden; width: 920px; top: -9999px;"></div>
 </div>
 
 <script>
+    // 預設初始資料
     let currentData = {
         date: "2024年5月20日 (星期一)",
         refNumber: "SUB-20240520-01",
@@ -193,7 +200,6 @@
             `;
         });
 
-        // 至少顯示 4 行
         for (let i = records.length; i < 4; i++) {
             rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
         }
@@ -246,24 +252,19 @@
     function updateDisplay() {
         const wrapper = document.getElementById('noticesWrapper');
         const measureContainer = document.getElementById('measureContainer');
-        const recordCount = currentData.records ? currentData.records.length : 0;
         
-        // 1. 生成存檔副本
+        // 1. 測量存檔副本高度
         const officeCopyHtml = createNoticeHTML('存檔副本 (Office Copy)');
-        
-        let needsPageBreak = false;
+        measureContainer.innerHTML = officeCopyHtml;
+        const officeHeight = measureContainer.offsetHeight;
+        const A4_HALF_HEIGHT = 500; 
 
-        // 優先邏輯：若少於或等於 4 行，強制不分頁
-        if (recordCount > 4) {
-            // 只有超過 4 行時才進行高度測量
-            measureContainer.innerHTML = officeCopyHtml;
-            const officeHeight = measureContainer.offsetHeight;
-            const A4_HALF_HEIGHT = 500; 
-            needsPageBreak = officeHeight > A4_HALF_HEIGHT;
-        }
-
+        const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
         const dividerHtml = needsPageBreak ? '<div class="page-break"></div>' : '<div class="copy-divider"></div>';
+        
+        // 如果需要分頁，為第二個副本加上列印時的頂部邊距類別
         const secondPageClass = needsPageBreak ? 'second-page-padding' : '';
+
         const teacherCopyHtml = createNoticeHTML('教師副本 (Teacher\'s Copy)');
         
         wrapper.innerHTML = `
@@ -321,3 +322,4 @@
 
 </body>
 </html>
+
