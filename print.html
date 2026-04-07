@@ -70,8 +70,9 @@
             font-weight: bold;
         }
 
+        /* 修改標頭底色為灰色 */
         th {
-            background-color: #f8fafc;
+            background-color: #d1d5db; /* Tailwind gray-300 */
         }
 
         .import-btn {
@@ -113,6 +114,10 @@
             }
             .copy-divider {
                 border-top: 1px solid #000; /* 列印時實線或隱藏 */
+            }
+            th {
+                background-color: #d1d5db !important; /* 確保列印時保留底色 */
+                -webkit-print-color-adjust: exact;
             }
         }
     </style>
