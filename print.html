@@ -274,6 +274,7 @@
         const A4_HALF_HEIGHT = 500; 
 
         // 3. 根據測量高度決定分隔線樣式
+        // 當存檔副本高度超過紙張一半時，將分隔線改為 page-break
         const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
         const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
 
