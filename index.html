@@ -1,15 +1,39 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  User, Calendar, Coffee, Utensils, Moon, Sun, XCircle, 
-  ChevronDown, UserPlus, FileSpreadsheet, Printer
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能編代課系統 v1.12.5 - 觀塘官立小學(秀明道)</title>
+    <!-- 使用 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel 用於瀏覽器端解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #F0F2F5;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-/**
- * 智能編代課系統 v1.12.5
- * * 修改重點：
- * 1. 放大底部「輸出Excel檔案」及「「代課通知單」版面」按鈕。
- * 2. 嚴格維持原有的版面設定、文字屬性及功能邏輯。
- */
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // 模擬 Lucide-React 圖標組件
+        const Icon = ({ name, className }) => {
+            useEffect(() => {
+                lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
 
 const INITIAL_RAW_DATA = {
   "mon": [
@@ -84,392 +108,284 @@ const INITIAL_RAW_DATA = {
    ],
 };
 
-const SCHEDULE_STRUCTURE = [
-  { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
-  { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
-  { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
-  { type: 'break', id: 'B1', label: '小息', time: '9:45 - 10:05', icon: <Sun className="w-5 h-5 text-black" />, csvKey: 'B1' },
-  { type: 'class', id: '3', label: '第三節', time: '10:05 - 10:40', csvKey: '3' },
-  { type: 'class', id: '4', label: '第四節', time: '10:40 - 11:15', csvKey: '4' },
-  { type: 'break', id: 'B2', label: '小休', time: '11:15 - 11:25', icon: <Coffee className="w-5 h-5 text-black" />, csvKey: 'B2' },
-  { type: 'class', id: '5', label: '第五節', time: '11:25 - 12:00', csvKey: '5' },
-  { type: 'class', id: '6', label: '第六節', time: '12:00 - 12:35', csvKey: '6' },
-  { type: 'class', id: 'LUNCH', label: '午膳', time: '12:35 - 1:15', icon: <Utensils className="w-5 h-5 text-black" />, csvKey: 'LUNCH' },
-  { type: 'break', id: 'REST', label: '午息', time: '1:15 - 1:35', icon: <Moon className="w-5 h-5 text-black" />, csvKey: 'REST' },
-  { type: 'class', id: '7', label: '第七節', time: '1:35 - 2:10', csvKey: '7' },
-  { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
-  { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
-];
+        const SCHEDULE_STRUCTURE = [
+          { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
+          { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
+          { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
+          { type: 'break', id: 'B1', label: '小息', time: '9:45 - 10:05', icon: 'sun', csvKey: 'B1' },
+          { type: 'class', id: '3', label: '第三節', time: '10:05 - 10:40', csvKey: '3' },
+          { type: 'class', id: '4', label: '第四節', time: '10:40 - 11:15', csvKey: '4' },
+          { type: 'break', id: 'B2', label: '小休', time: '11:15 - 11:25', icon: 'coffee', csvKey: 'B2' },
+          { type: 'class', id: '5', label: '第五節', time: '11:25 - 12:00', csvKey: '5' },
+          { type: 'class', id: '6', label: '第六節', time: '12:00 - 12:35', csvKey: '6' },
+          { type: 'class', id: 'LUNCH', label: '午膳', time: '12:35 - 1:15', icon: 'utensils', csvKey: 'LUNCH' },
+          { type: 'break', id: 'REST', label: '午息', time: '1:15 - 1:35', icon: 'moon', csvKey: 'REST' },
+          { type: 'class', id: '7', label: '第七節', time: '1:35 - 2:10', csvKey: '7' },
+          { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
+          { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
+        ];
 
-const DAYS_CONFIG = [
-  { id: 'mon', label: '一', offset: 1 },
-  { id: 'tue', label: '二', offset: 2 },
-  { id: 'wed', label: '三', offset: 3 },
-  { id: 'thur', label: '四', offset: 4 },
-  { id: 'fri', label: '五', offset: 5 }
-];
+        const DAYS_CONFIG = [
+          { id: 'mon', label: '一', offset: 1 },
+          { id: 'tue', label: '二', offset: 2 },
+          { id: 'wed', label: '三', offset: 3 },
+          { id: 'thur', label: '四', offset: 4 },
+          { id: 'fri', label: '五', offset: 5 }
+        ];
 
-const MAROON_TEACHERS = ["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"];
-const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
+        const MAROON_TEACHERS = ["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"];
+        const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
 
-export default function App() {
-  const [rawData] = useState(INITIAL_RAW_DATA);
-  const [selectedTeacher, setSelectedTeacher] = useState("");
-  const [activeTab, setActiveTab] = useState('mon');
-  const [subRequest, setSubRequest] = useState(null);
-  const [assignments, setAssignments] = useState({});
-  const [leaveReasons, setLeaveReasons] = useState({});
-  const [todayDate, setTodayDate] = useState(new Date());
+        function App() {
+          const [rawData] = useState(INITIAL_RAW_DATA);
+          const [selectedTeacher, setSelectedTeacher] = useState("");
+          const [activeTab, setActiveTab] = useState('mon');
+          const [assignments, setAssignments] = useState({});
+          const [todayDate, setTodayDate] = useState(new Date());
 
-  useEffect(() => {
-    const day = todayDate.getDay();
-    const dayMap = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thur', 5: 'fri' };
-    if (dayMap[day]) setActiveTab(dayMap[day]);
-    const timer = setInterval(() => setTodayDate(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+          useEffect(() => {
+            const day = todayDate.getDay();
+            const dayMap = { 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thur', 5: 'fri' };
+            if (dayMap[day]) setActiveTab(dayMap[day]);
+          }, []);
 
-  const displayDateInfo = useMemo(() => {
-    const currentDayConfig = DAYS_CONFIG.find(d => d.id === activeTab);
-    const dayOfWeek = todayDate.getDay();
-    let baseDate = new Date(todayDate);
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        baseDate.setDate(todayDate.getDate() + (dayOfWeek === 0 ? 1 : 2));
-    } else {
-        baseDate.setDate(todayDate.getDate() + (1 - dayOfWeek));
-    }
-    const targetDate = new Date(baseDate);
-    targetDate.setDate(baseDate.getDate() + (currentDayConfig.offset - 1));
-    return {
-      fullDate: targetDate,
-      dateString: targetDate.toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric' }),
-      dateRaw: targetDate.toISOString().split('T')[0].replace(/-/g, ''),
-      weekday: `星期${currentDayConfig.label}`
-    };
-  }, [activeTab, todayDate]);
+          const displayDateInfo = useMemo(() => {
+            const currentDayConfig = DAYS_CONFIG.find(d => d.id === activeTab);
+            const dayOfWeek = todayDate.getDay();
+            let baseDate = new Date(todayDate);
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                baseDate.setDate(todayDate.getDate() + (dayOfWeek === 0 ? 1 : 2));
+            } else {
+                baseDate.setDate(todayDate.getDate() + (1 - dayOfWeek));
+            }
+            const targetDate = new Date(baseDate);
+            targetDate.setDate(baseDate.getDate() + (currentDayConfig.offset - 1));
+            return {
+              fullDate: targetDate,
+              dateString: targetDate.toLocaleDateString('zh-HK', { year: 'numeric', month: 'long', day: 'numeric' }),
+              dateRaw: targetDate.toISOString().split('T')[0].replace(/-/g, ''),
+              weekday: `星期${currentDayConfig.label}`
+            };
+          }, [activeTab, todayDate]);
 
-  const teachers = useMemo(() => {
-    const dayData = rawData[activeTab] || rawData.mon;
-    const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
-    return headerRow ? headerRow.slice(1).filter(t => t && t.trim() !== "") : [];
-  }, [rawData, activeTab]);
+          const teachers = useMemo(() => {
+            const dayData = rawData[activeTab] || rawData.mon;
+            const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+            return headerRow ? headerRow.slice(1).filter(t => t && t.trim() !== "") : [];
+          }, [rawData, activeTab]);
 
-  const getTeacherSchedule = (teacherName, dayId) => {
-    const dayData = rawData[dayId] || rawData.mon;
-    const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
-    if (!headerRow) return Array(SCHEDULE_STRUCTURE.length).fill("");
-    const teacherIdx = headerRow.indexOf(teacherName);
-    if (teacherIdx === -1) return Array(SCHEDULE_STRUCTURE.length).fill("");
-    return SCHEDULE_STRUCTURE.map(slot => {
-      const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
-      return dataRow ? dataRow[teacherIdx] || "" : "";
-    });
-  };
+          const getTeacherSchedule = (teacherName, dayId) => {
+            const dayData = rawData[dayId] || rawData.mon;
+            const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+            if (!headerRow) return Array(SCHEDULE_STRUCTURE.length).fill("");
+            const teacherIdx = headerRow.indexOf(teacherName);
+            if (teacherIdx === -1) return Array(SCHEDULE_STRUCTURE.length).fill("");
+            return SCHEDULE_STRUCTURE.map(slot => {
+              const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
+              return dataRow ? dataRow[teacherIdx] || "" : "";
+            });
+          };
 
-  const isClassOccupied = (content) => {
-    if (!content || content.trim() === "") return false;
-    const busyKeywords = ["BREAK", "REST", "小息", "小休", "午息", "午休", "班主任節"];
-    return !busyKeywords.some(b => content.toUpperCase().includes(b));
-  };
+          const isClassOccupied = (content) => {
+            if (!content || content.trim() === "") return false;
+            const busyKeywords = ["BREAK", "REST", "小息", "小休", "午息", "午休", "班主任節"];
+            return !busyKeywords.some(b => content.toUpperCase().includes(b));
+          };
 
-  const getAvailableTeachers = (dayId, lessonIdx) => {
-    const available = [];
-    const seenNames = new Set();
-    teachers.forEach(t => {
-      if (seenNames.has(t) || t === selectedTeacher) return;
-      const schedule = getTeacherSchedule(t, dayId);
-      if (!isClassOccupied(schedule[lessonIdx])) {
-        const totalLessons = schedule.filter(l => isClassOccupied(l)).length;
-        const hasPrevLesson = lessonIdx > 0 ? isClassOccupied(schedule[lessonIdx - 1]) : false;
-        const hasNextLesson = lessonIdx < schedule.length - 1 ? isClassOccupied(schedule[lessonIdx + 1]) : false;
-        available.push({ id: t, total: totalLessons, hasPrevLesson, hasNextLesson });
-        seenNames.add(t);
-      }
-    });
-    return available.sort((a, b) => a.total - b.total);
-  };
+          const getAvailableTeachers = (dayId, lessonIdx) => {
+            const available = [];
+            const seenNames = new Set();
+            teachers.forEach(t => {
+              if (seenNames.has(t) || t === selectedTeacher) return;
+              const schedule = getTeacherSchedule(t, dayId);
+              if (!isClassOccupied(schedule[lessonIdx])) {
+                const totalLessons = schedule.filter(l => isClassOccupied(l)).length;
+                available.push({ id: t, total: totalLessons });
+                seenNames.add(t);
+              }
+            });
+            return available.sort((a, b) => a.total - b.total);
+          };
 
-  const getTeacherTextColor = (name) => {
-    if (MAROON_TEACHERS.includes(name)) return 'text-[#800000]';
-    if (GREEN_TEACHERS.includes(name)) return 'text-emerald-700';
-    return 'text-black';
-  };
+          const getTeacherTextColor = (name) => {
+            if (MAROON_TEACHERS.includes(name)) return 'text-[#800000]';
+            if (GREEN_TEACHERS.includes(name)) return 'text-emerald-700';
+            return 'text-black';
+          };
 
-  const handleAssignSub = (lessonIdx, subId) => {
-    const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
-    setAssignments(prev => ({ ...prev, [key]: subId }));
-  };
+          const handleAssignSub = (lessonIdx, subId) => {
+            const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
+            setAssignments(prev => ({ ...prev, [key]: subId }));
+          };
 
-  const handleRemoveSub = (lessonIdx) => {
-    const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
-    const newAssignments = { ...assignments };
-    delete newAssignments[key];
-    setAssignments(newAssignments);
-  };
+          const handleRemoveSub = (lessonIdx) => {
+            const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
+            const newAssignments = { ...assignments };
+            delete newAssignments[key];
+            setAssignments(newAssignments);
+          };
 
-  const handleReasonChange = (e) => {
-    const key = `${selectedTeacher}-${activeTab}`;
-    setLeaveReasons(prev => ({ ...prev, [key]: e.target.value }));
-  };
+          const handleExportExcel = () => {
+            if (!selectedTeacher) return;
+            const fileName = `SUB-${displayDateInfo.dateRaw}`;
+            const headers = ["代課日期", "檔案編號", "原任老師", "節數", "班別", "科目", "代課老師"];
+            const rows = SCHEDULE_STRUCTURE.map((slot, idx) => {
+              const assignedSub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
+              if (!assignedSub) return null;
+              const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
+              let classCode = "", subject = "";
+              if (content.includes('/')) [classCode, subject] = content.split('/');
+              else { classCode = content; subject = slot.id === 'HR' ? "班主任節" : slot.label; }
+              return [displayDateInfo.dateString, fileName, selectedTeacher, slot.label, classCode, subject, assignedSub];
+            }).filter(row => row !== null);
+            
+            if (rows.length === 0) return;
+            const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `${fileName}.csv`;
+            link.click();
+          };
 
-  const handleExportExcel = () => {
-    if (!selectedTeacher) return;
-    const fileName = `SUB-${displayDateInfo.dateRaw}`;
-    const headers = ["代課日期", "檔案編號(SUB-年月日)", "原任老師", "節數", "班別", "科目", "代課老師"];
-    const rows = SCHEDULE_STRUCTURE.map((slot, idx) => {
-      const assignedSub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
-      if (!assignedSub) return null;
-      const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
-      let classCode = "", subject = "";
-      if (content.includes('/')) [classCode, subject] = content.split('/');
-      else { classCode = content; subject = slot.id === 'HR' ? "班主任節" : slot.label; }
-      return [displayDateInfo.dateString, fileName, selectedTeacher, slot.label, classCode, subject, assignedSub];
-    }).filter(row => row !== null);
-    if (rows.length === 0) {
-      alert("請先為課堂安排代課老師後再進行輸出。");
-      return;
-    }
-    const csvContent = "\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${fileName}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleOpenPrintLayout = () => {
-    window.open("https://gogo2526.github.io/sub-system/print.html", "_blank");
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F0F2F5] text-slate-900 p-4 md:p-6 font-sans">
-      
-      {/* 標題與基礎設置 */}
-      <header className="max-w-7xl mx-auto mb-10 space-y-6">
-        <div className="flex items-start gap-5">
-          <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
-            <Calendar className="text-white w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-            <h2 className="text-xl font-bold text-blue-600">智能編代課系統 v1.12.5</h2>
-          </div>
-        </div>
-
-        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-2.5 rounded-3xl shadow-sm border border-slate-200">
-          <div className="relative group w-full md:w-auto min-w-[240px]">
-            <select
-              value={selectedTeacher}
-              onChange={(e) => { setSelectedTeacher(e.target.value); setSubRequest(null); }}
-              className="pl-11 pr-8 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black hover:border-blue-600 outline-none transition-all cursor-pointer appearance-none w-full shadow-sm text-black"
-            >
-              <option value="" disabled>請選擇缺席教師...</option>
-              {teachers.map((t, idx) => (
-                <option key={`${t}-${idx}`} value={t} className={getTeacherTextColor(t)}>{t}</option>
-              ))}
-            </select>
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-blue-600 pointer-events-none" />
-            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-          </div>
-
-          <div className="flex bg-slate-50 p-1.5 rounded-2xl w-full md:w-auto">
-            {DAYS_CONFIG.map(day => (
-              <button
-                key={day.id}
-                onClick={() => { setActiveTab(day.id); setSubRequest(null); }}
-                className={`flex-1 px-6 py-3 text-2xl font-black rounded-xl transition-all ${activeTab === day.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-blue-600'}`}
-              >
-                {day.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      {/* 主要課表區域 */}
-      <div className="max-w-7xl mx-auto">
-        {!selectedTeacher ? (
-          <div className="bg-white rounded-[3rem] border-4 border-dashed border-slate-200 h-[50vh] flex flex-col items-center justify-center text-slate-400">
-            <User className="w-24 h-24 opacity-10 mb-8" />
-            <h3 className="text-3xl font-black mb-2 text-slate-500">準備開始編配代課</h3>
-            <p className="text-xl font-bold opacity-60">請先從上方選單揀選缺席教師</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8 w-full">
-            <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
-              <div className="p-10 border-b border-slate-100 bg-gradient-to-br from-white to-blue-50/30">
-                <div className="flex gap-8">
-                  <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white text-4xl font-black shadow-2xl">
-                    {selectedTeacher.charAt(0)}
+          return (
+            <div className="min-h-screen p-4 md:p-6">
+              <header className="max-w-7xl mx-auto mb-10 space-y-6">
+                <div className="flex items-start gap-5">
+                  <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3 text-white">
+                    <Icon name="calendar" className="w-8 h-8" />
                   </div>
-                  <div className="flex flex-col gap-2 w-full">
-                    <h2 className="text-4xl font-black tracking-tighter text-black">上課時間表 ({selectedTeacher})</h2>
-                    <p className="font-black text-2xl text-slate-700">日期：{displayDateInfo.dateString} ({displayDateInfo.weekday})</p>
-                    <div className="mt-2 text-2xl font-black text-black flex flex-wrap items-center gap-1">
-                      <span className="shrink-0">缺課原因：</span>
-                      <div className="relative inline-flex items-center min-w-[180px]">
-                        <select 
-                          value={leaveReasons[`${selectedTeacher}-${activeTab}`] || ""} 
-                          onChange={handleReasonChange}
-                          className="bg-transparent border-none outline-none focus:ring-0 cursor-pointer text-black appearance-none pr-8 py-0"
-                        >
-                          <option value="">請揀選原因...</option>
-                          <option value="病假">病假</option>
-                          <option value="事假">事假</option>
-                          <option value="出席工作坊">出席工作坊</option>
-                          <option value="進修">進修</option>
-                          <option value="校內活動">校內活動</option>
-                          <option value="出外參觀">出外參觀</option>
-                          <option value="境外交流">境外交流</option>
-                          <option value="其他">其他</option>
-                        </select>
-                        <ChevronDown className="w-5 h-5 absolute right-0 text-slate-400 pointer-events-none" />
-                      </div>
-                    </div>
+                  <div>
+                    <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
+                    <h2 className="text-xl font-bold text-blue-600">智能編代課系統 v1.12.5</h2>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-8 space-y-4">
-                {SCHEDULE_STRUCTURE.map((slot, idx) => {
-                  const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
-                  const isBreak = slot.type === 'break';
-                  const isSelected = subRequest && subRequest.lessonIdx === idx;
-                  const assignedSub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
-                  const isActualLesson = isClassOccupied(content);
-                  let classCode = "", subject = "";
-                  if (isActualLesson) {
-                    if (content.includes('/')) [classCode, subject] = content.split('/');
-                    else { classCode = content; subject = slot.id === 'HR' ? "班主任節" : slot.label; }
-                  }
-                  if (isBreak) {
-                    return (
-                      <div key={idx} className="bg-slate-100 border-2 border-slate-400 rounded-2xl py-3 px-8 flex items-center justify-between">
-                        <span className="text-lg font-black text-black tracking-widest">{slot.time}</span>
-                        <div className="flex items-center gap-4">
-                          <span className="font-black text-black text-2xl">{slot.label}</span>
-                          {slot.icon}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={idx} className="relative">
-                      <div 
-                        onClick={() => isActualLesson && !assignedSub && setSubRequest({ lessonIdx: idx })}
-                        className={`flex flex-col md:flex-row gap-6 p-6 rounded-[2rem] border-2 transition-all ${
-                          isActualLesson 
-                            ? isSelected ? "bg-orange-50 border-[#800000] scale-[1.02] shadow-lg" 
-                            : assignedSub ? "bg-[#E3F2FD] border-slate-500"
-                            : slot.id === 'LUNCH' ? "bg-[#FFF9E3] border-slate-500 hover:border-blue-400 cursor-pointer"
-                            : "bg-white border-slate-500 hover:border-blue-400 cursor-pointer"
-                          : "bg-slate-50 border-slate-300"
-                        }`}
+                <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-2.5 rounded-3xl shadow-sm border border-slate-200">
+                  <div className="relative w-full md:w-auto min-w-[240px]">
+                    <select 
+                      value={selectedTeacher}
+                      onChange={(e) => setSelectedTeacher(e.target.value)}
+                      className="pl-11 pr-8 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black hover:border-blue-600 outline-none transition-all cursor-pointer appearance-none w-full shadow-sm text-black"
+                    >
+                      <option value="" disabled>請選擇缺席教師...</option>
+                      {teachers.map((t, idx) => (
+                        <option key={`${t}-${idx}`} value={t} className={getTeacherTextColor(t)}>{t}</option>
+                      ))}
+                    </select>
+                    <Icon name="user" className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-blue-600 pointer-events-none" />
+                    <Icon name="chevron-down" className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                  </div>
+
+                  <div className="flex bg-slate-50 p-1.5 rounded-2xl w-full md:w-auto">
+                    {DAYS_CONFIG.map(day => (
+                      <button 
+                        key={day.id}
+                        onClick={() => setActiveTab(day.id)}
+                        className={`flex-1 px-6 py-3 text-2xl font-black rounded-xl transition-all ${activeTab === day.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-blue-600'}`}
                       >
-                        <div className="md:w-56 flex flex-col justify-center border-r pr-6 border-slate-100">
-                          <span className="text-xl font-black uppercase tracking-tight text-slate-700">{slot.label}</span>
-                          <span className="text-3xl font-black mt-1 text-slate-800">{slot.time}</span>
-                        </div>
-                        <div className="flex-grow flex items-center">
-                          {isActualLesson ? (
-                            <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center gap-8">
-                                <div className="px-6 py-2 bg-white rounded-xl font-black text-3xl tracking-tighter shadow-sm border-2 text-[#008080] border-[#008080]">
-                                  {classCode}
-                                </div>
-                                <div className="text-3xl font-black text-blue-700">
-                                  {subject}
-                                </div>
-                              </div>
-                              <div className="flex items-center ml-auto">
-                                {assignedSub ? (
-                                  <div className="flex items-center gap-3 px-6 py-2">
-                                    <span className={`${assignedSub === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(assignedSub)}`}>{assignedSub}</span>
-                                    <span className="text-2xl font-bold opacity-80 text-slate-700">代課</span>
-                                    <button onClick={(e) => { e.stopPropagation(); handleRemoveSub(idx); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><XCircle className="w-7 h-7" /></button>
-                                  </div>
-                                ) : !isSelected && (
-                                  <div className="flex items-center gap-2 group text-slate-500">
-                                    <UserPlus className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
-                                    <span className="text-sm font-black uppercase tracking-wide group-hover:text-blue-600">安排代課</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-3xl font-black text-slate-500 italic tracking-widest ml-4 uppercase">吉堂</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {isSelected && (
-                        <div className="mt-4 p-8 bg-[#FFF9E3] border-2 border-slate-500 rounded-[2.5rem] animate-in zoom-in-95 shadow-xl">
-                          <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-8 text-black">
-                            <div className="flex flex-col gap-4 w-full">
-                              <h4 className="text-4xl font-black flex items-center gap-4">選擇代課教師</h4>
-                              <div className="bg-blue-50 border-2 border-slate-500 rounded-2xl p-4 flex flex-col gap-1.5 w-fit shadow-sm">
-                                <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
-                                  <span>紅點：代表該節前後有課堂</span>
-                                </div>
-                                <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block shadow-sm"></span>
-                                  <span>綠點：代表該節前後沒有課堂</span>
-                                </div>
-                                <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                  <span className="w-2.5 text-center font-black">*</span>
-                                  <span>左右點分別代表「前一節」及「後一節」的狀態</span>
-                                </div>
-                              </div>
-                            </div>
-                            <button onClick={() => setSubRequest(null)} className="bg-white px-4 py-2 rounded-xl border-2 border-slate-500 font-black text-lg text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all shrink-0">取消選取</button>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                            {getAvailableTeachers(activeTab, idx).map((sub, sIdx) => (
-                              <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className="bg-white p-6 rounded-2xl border-2 border-orange-300 hover:border-[#800000] hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className={`w-3 h-3 rounded-full shadow-sm ${sub.hasPrevLesson ? 'bg-red-500' : 'bg-green-500'}`} title="上一節"></div>
-                                    <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)}`}>{sub.id}</span>
-                                    <div className={`w-3 h-3 rounded-full shadow-sm ${sub.hasNextLesson ? 'bg-red-500' : 'bg-green-500'}`} title="下一節"></div>
-                                </div>
-                                <span className="text-3xl font-black text-slate-700">{sub.total}節</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                
-                {/* 底部按鈕區域 (已放大) */}
-                <div className="pt-16 pb-12 flex flex-col md:flex-row items-center justify-center gap-8">
-                  <button 
-                    onClick={handleExportExcel}
-                    className="flex items-center gap-5 px-12 py-6 bg-emerald-600 text-white rounded-[2.5rem] font-black text-3xl shadow-2xl hover:bg-emerald-700 transform hover:-translate-y-1 transition-all active:scale-95"
-                  >
-                    <FileSpreadsheet className="w-8 h-8" />
-                    輸出 Excel 檔案
-                  </button>
-                  <button 
-                    onClick={handleOpenPrintLayout}
-                    className="flex items-center gap-5 px-12 py-6 bg-blue-600 text-white rounded-[2.5rem] font-black text-3xl shadow-2xl hover:bg-blue-700 transform hover:-translate-y-1 transition-all active:scale-95"
-                  >
-                    <Printer className="w-8 h-8" />
-                    「代課通知單」版面
-                  </button>
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              </header>
 
-                <div className="pb-4"></div>
-              </div>
+              <main className="max-w-7xl mx-auto">
+                {!selectedTeacher ? (
+                  <div className="bg-white rounded-[3rem] border-4 border-dashed border-slate-200 h-[50vh] flex flex-col items-center justify-center text-slate-400">
+                    <Icon name="user" className="w-24 h-24 opacity-10 mb-8" />
+                    <h3 className="text-3xl font-black mb-2 text-slate-500">準備開始編配代課</h3>
+                    <p className="text-xl font-bold opacity-60">請先從上方選單揀選缺席教師</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+                    <div className="p-10 border-b border-slate-100 bg-gradient-to-br from-white to-blue-50/30">
+                        <div className="flex gap-8">
+                            <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white text-4xl font-black shadow-2xl">
+                                {selectedTeacher.charAt(0)}
+                            </div>
+                            <div className="flex flex-col gap-2 w-full">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-4xl font-black tracking-tighter text-black">{selectedTeacher} 老師的代課安排</h2>
+                                    <div className="flex items-center gap-3 px-6 py-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                        <Icon name="calendar" className="w-5 h-5 text-blue-600" />
+                                        <span className="text-xl font-black text-slate-700">{displayDateInfo.dateString} ({displayDateInfo.weekday})</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-8 space-y-4">
+                      {SCHEDULE_STRUCTURE.map((slot, idx) => {
+                        const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
+                        const isBusy = isClassOccupied(content);
+                        const subId = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
+                        const availableSubs = getAvailableTeachers(activeTab, idx);
+
+                        return (
+                          <div key={idx} className={`flex items-center p-6 rounded-3xl border-2 transition-all ${!isBusy ? 'bg-slate-50 opacity-50 border-slate-100' : subId ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-blue-200 shadow-sm'}`}>
+                            <div className="w-40 shrink-0">
+                                <span className="text-sm font-black text-slate-400 block mb-1">{slot.time}</span>
+                                <div className="flex items-center gap-2">
+                                    {slot.icon && <Icon name={slot.icon} className="w-5 h-5 text-black" />}
+                                    <span className="text-xl font-black text-slate-800">{slot.label}</span>
+                                </div>
+                            </div>
+                            <div className="flex-1 px-8">
+                                {isBusy ? (
+                                    <span className="text-2xl font-black text-blue-600">
+                                        {content.split('/')[0]} <span className="text-slate-400 mx-2">|</span> {content.split('/')[1] || "課堂"}
+                                    </span>
+                                ) : (
+                                    <span className="text-slate-400 font-bold italic text-lg">{content || "— 非授課時間 —"}</span>
+                                )}
+                            </div>
+                            {isBusy && (
+                                <div className="w-80 flex justify-end">
+                                    {subId ? (
+                                        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-emerald-200 shadow-sm">
+                                            <Icon name="user-plus" className="w-6 h-6 text-emerald-600" />
+                                            <span className="text-2xl font-black text-emerald-700">{subId}</span>
+                                            <button onClick={() => handleRemoveSub(idx)} className="text-slate-300 hover:text-red-500"><Icon name="x-circle" className="w-6 h-6" /></button>
+                                        </div>
+                                    ) : (
+                                        <div className="relative w-full">
+                                            <select onChange={(e) => handleAssignSub(idx, e.target.value)} value="" className="w-full pl-10 pr-8 py-3.5 bg-blue-50 border-2 border-blue-100 rounded-2xl text-lg font-black text-blue-700 appearance-none">
+                                                <option value="">選擇代課老師...</option>
+                                                {availableSubs.map(s => <option key={s.id} value={s.id} className={getTeacherTextColor(s.id)}>{s.id} (共 {s.total} 節)</option>)}
+                                            </select>
+                                            <Icon name="user-plus" className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 opacity-50 text-blue-600" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="p-10 bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row gap-6">
+                        <button onClick={handleExportExcel} className="flex-1 flex items-center justify-center gap-4 py-8 bg-blue-600 text-white rounded-[2rem] text-3xl font-black shadow-2xl hover:bg-blue-700 transition-all">
+                            <Icon name="file-spreadsheet" className="w-10 h-10" /> 輸出 Excel 檔案
+                        </button>
+                        <button onClick={() => window.open('https://gogo2526.github.io/sub-system/print.html', '_blank')} className="flex-1 flex items-center justify-center gap-4 py-8 bg-white border-4 border-blue-600 text-blue-600 rounded-[2rem] text-3xl font-black shadow-2xl hover:bg-blue-50 transition-all">
+                            <Icon name="printer" className="w-10 h-10" /> 代課通知單版面
+                        </button>
+                    </div>
+                  </div>
+                )}
+              </main>
+              <footer className="max-w-7xl mx-auto mt-12 mb-8 text-center text-slate-400 font-bold">
+                觀塘官立小學(秀明道) • 內部行政使用
+              </footer>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
