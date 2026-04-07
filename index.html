@@ -240,7 +240,7 @@
       const handleExportExcel = () => {
         if (!selectedTeacher) return;
         const fileName = `SUB-${displayDateInfo.dateRaw}`;
-        const headers = ["代課日期", "檔案編號(SUB-年月日)", "原任老師", "節數", "班別", "科目", "代課老師"];
+        const headers = ["代課日期", "檔案編號", "原任老師", "節數", "班別", "科目", "代課老師"];
         const rows = SCHEDULE_STRUCTURE.map((slot, idx) => {
           const assignedSub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
           if (!assignedSub) return null;
