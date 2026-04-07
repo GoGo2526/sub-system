@@ -8,22 +8,21 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-
         body {
             font-family: 'Noto Sans TC', sans-serif;
             background-color: #F0F2F5;
             margin: 0;
             -webkit-font-smoothing: antialiased;
         }
-
         .text-maroon { color: #800000; }
         select { cursor: pointer; }
-        
-        /* 避免 Babel 載入前的畫面閃爍 */
         [v-cloak] { display: none; }
+        /* 增加動畫讓加載更順滑 */
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -32,26 +31,28 @@
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        // 修正後的 Icon 組件：確保每次名稱變動或渲染後都重新執行圖標轉換
+        // 修正後的 Icon 組件：使用 React 生命週期確保圖標渲染
         const Icon = ({ name, className }) => {
             const iconRef = useRef(null);
 
             useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons();
+                if (window.lucide && iconRef.current) {
+                    window.lucide.createIcons({
+                        attrs: { class: className }
+                    });
                 }
-            }, [name]); // 當圖標名稱改變時觸發
+            }, [name, className]);
 
             return (
                 <i 
+                    ref={iconRef}
                     data-lucide={name} 
                     className={`${className} inline-block`}
-                    style={{ minWidth: '1em', minHeight: '1em' }}
                 ></i>
             );
         };
 
-        // --- 排課原始數據 (保持不變) ---
+        // --- 原始數據 (與原版一致) ---
 const INITIAL_RAW_DATA = {
   "mon": [
     ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
@@ -125,7 +126,7 @@ const INITIAL_RAW_DATA = {
    ],
 };
 
-
+        // ... (保持原本的 SCHEDULE_STRUCTURE, DAYS_CONFIG, MAROON_TEACHERS, GREEN_TEACHERS 不變)
         const SCHEDULE_STRUCTURE = [
           { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
           { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
@@ -267,7 +268,7 @@ const INITIAL_RAW_DATA = {
           };
 
           return (
-            <div className="min-h-screen p-4 md:p-6">
+            <div className="min-h-screen p-4 md:p-6 fade-in">
               <header className="max-w-7xl mx-auto mb-10 space-y-6">
                 <div className="flex items-start gap-5">
                   <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3 text-white">
