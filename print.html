@@ -31,6 +31,11 @@
             position: relative;
         }
 
+        /* 副本包裝容器 */
+        .notice-wrapper {
+            width: 100%;
+        }
+
         /* 分隔線 */
         .copy-divider {
             border-top: 2px dashed #ccc;
@@ -93,7 +98,6 @@
         @media print {
             @page {
                 size: A4 portrait;
-                /* 設定 margin 為 0 以隱藏瀏覽器預設的頁首頁尾（如網址、日期） */
                 margin: 0;
             }
             body {
@@ -106,25 +110,26 @@
             .page-container {
                 box-shadow: none;
                 border: none;
-                /* 因為 @page margin 為 0，需透過 padding 確保內容不貼邊 */
-                padding: 1.5cm;
+                padding: 1.5cm; /* 第一頁內容的基礎邊距 */
                 max-width: 100%;
             }
-            /* 強制分頁 */
+            /* 強制分頁後的樣式 */
             .page-break {
                 page-break-before: always;
-                border-top: none;
+                border: none;
                 margin: 0;
                 height: 0;
             }
-            .page-break::after {
-                display: none;
+            /* 當需要分頁時，為第二頁頂部預留與第一頁相同的距離 */
+            .second-page-padding {
+                padding-top: 1.5cm;
             }
+            
             .copy-divider {
                 border-top: 1px solid #000;
             }
             th {
-                background-color: #9ca3af !important; /* 確保列印時保留底色 */
+                background-color: #9ca3af !important;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
@@ -148,7 +153,7 @@
 <div class="page-container" id="mainContent">
     <!-- 這裡會由 JS 生成兩份副本 -->
     <div id="noticesWrapper"></div>
-    <!-- 隱藏的測量容器，模擬 A4 寬度以獲得正確高度 -->
+    <!-- 隱藏的測量容器 -->
     <div id="measureContainer" style="position: absolute; visibility: hidden; width: 920px; top: -9999px;"></div>
 </div>
 
@@ -165,29 +170,16 @@
         ]
     };
 
-    /**
-     * 輔助函數：解析日期字串並獲取星期
-     */
     function formatWithDayOfWeek(dateStr) {
         if (!dateStr) return "";
-        
-        // 如果已經包含括號或「星期」，則不重複處理
         if (dateStr.includes('(') || dateStr.includes('星期')) return dateStr;
-
         const cleanDateStr = dateStr.replace('年', '-').replace('月', '-').replace('日', '');
         const dateObj = new Date(cleanDateStr);
-        
         if (isNaN(dateObj.getTime())) return dateStr;
-
         const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-        const dayName = days[dateObj.getDay()];
-        
-        return `${dateStr} (${dayName})`;
+        return `${dateStr} (${days[dateObj.getDay()]})`;
     }
 
-    /**
-     * 生成單份通知單的 HTML 結構
-     */
     function createNoticeHTML(typeLabel) {
         const records = currentData.records || [];
         let rowsHtml = '';
@@ -208,7 +200,6 @@
             `;
         });
 
-        // 至少補滿 4 行
         for (let i = records.length; i < 4; i++) {
             rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
         }
@@ -258,43 +249,38 @@
         `;
     }
 
-    /**
-     * 更新畫面內容並判斷是否需要自動分頁
-     */
     function updateDisplay() {
         const wrapper = document.getElementById('noticesWrapper');
         const measureContainer = document.getElementById('measureContainer');
         
-        // 1. 先生成「存檔副本」內容進行高度測量
+        // 1. 測量存檔副本高度
         const officeCopyHtml = createNoticeHTML('存檔副本 (Office Copy)');
         measureContainer.innerHTML = officeCopyHtml;
-        
-        // 2. 獲取高度（A4 紙張高度一半約為 500-550px，依邊距彈性調整）
         const officeHeight = measureContainer.offsetHeight;
         const A4_HALF_HEIGHT = 500; 
 
-        // 3. 根據測量高度決定分隔線樣式
-        // 當存檔副本高度超過紙張一半時，將分隔線改為 page-break
         const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
-        const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
+        const dividerHtml = needsPageBreak ? '<div class="page-break"></div>' : '<div class="copy-divider"></div>';
+        
+        // 如果需要分頁，為第二個副本加上列印時的頂部邊距類別
+        const secondPageClass = needsPageBreak ? 'second-page-padding' : '';
 
-        // 4. 生成教師副本並完整渲染
         const teacherCopyHtml = createNoticeHTML('教師副本 (Teacher\'s Copy)');
         
         wrapper.innerHTML = `
-            <div id="office-section">${officeCopyHtml}</div>
-            <div class="${dividerClass}"></div>
-            <div id="teacher-section">${teacherCopyHtml}</div>
+            <div class="notice-wrapper" id="office-section">
+                ${officeCopyHtml}
+            </div>
+            ${dividerHtml}
+            <div class="notice-wrapper ${secondPageClass}" id="teacher-section">
+                ${teacherCopyHtml}
+            </div>
         `;
     }
 
-    /**
-     * 處理檔案匯入
-     */
     function handleFileUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = function(e) {
             const content = e.target.result;
@@ -308,37 +294,29 @@
                 }
                 updateDisplay();
             } catch (err) {
-                alert("讀取檔案失敗，請檢查格式是否正確。");
+                alert("讀取檔案失敗。");
             }
         };
         reader.readAsText(file);
     }
 
-    /**
-     * CSV 解析邏輯
-     */
     function parseCSV(csvText) {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         const headers = lines[0].split(',').map(h => h.trim());
         const records = [];
-        
         for(let i = 1; i < lines.length; i++) {
             const values = lines[i].split(',').map(v => v.trim());
             const obj = {};
             headers.forEach((h, idx) => obj[h] = values[idx]);
             records.push(obj);
         }
-
-        const rawDate = records[0]?.["代課日期"] || "未提供日期";
-        
         return {
-            date: formatWithDayOfWeek(rawDate),
+            date: formatWithDayOfWeek(records[0]?.["代課日期"] || ""),
             refNumber: records[0]?.["處理編號"] || "SUB-NEW",
             records: records
         };
     }
 
-    // 初始化顯示
     window.onload = updateDisplay;
 </script>
 
