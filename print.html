@@ -108,12 +108,18 @@
                 padding: 0;
                 max-width: 100%;
             }
-            /* 如果內容太長，強制分頁 */
+            /* 強制分頁 */
             .page-break {
                 page-break-before: always;
+                border-top: none;
+                margin: 0;
+                height: 0;
+            }
+            .page-break::after {
+                display: none;
             }
             .copy-divider {
-                border-top: 1px solid #000; /* 列印時實線或隱藏 */
+                border-top: 1px solid #000;
             }
             th {
                 background-color: #9ca3af !important; /* 確保列印時保留底色 */
@@ -139,6 +145,8 @@
 <div class="page-container" id="mainContent">
     <!-- 這裡會由 JS 生成兩份副本 -->
     <div id="noticesWrapper"></div>
+    <!-- 隱藏的測量容器 -->
+    <div id="measureContainer" style="position: absolute; visibility: hidden; width: 920px;"></div>
 </div>
 
 <script>
@@ -163,11 +171,10 @@
         // 如果已經包含括號或「星期」，則不重複處理
         if (dateStr.includes('(') || dateStr.includes('星期')) return dateStr;
 
-        // 嘗試清理字串並解析 (例如將「2024年5月20日」轉為日期對象)
         const cleanDateStr = dateStr.replace('年', '-').replace('月', '-').replace('日', '');
         const dateObj = new Date(cleanDateStr);
         
-        if (isNaN(dateObj.getTime())) return dateStr; // 無法解析則回傳原樣
+        if (isNaN(dateObj.getTime())) return dateStr;
 
         const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
         const dayName = days[dateObj.getDay()];
@@ -178,13 +185,12 @@
     /**
      * 生成單份通知單的 HTML 結構
      */
-    function createNoticeHTML(titleTag, typeLabel) {
+    function createNoticeHTML(typeLabel) {
         const records = currentData.records || [];
         let rowsHtml = '';
         
         records.forEach((row, index) => {
             const prevRow = records[index - 1];
-            // 處理跨行顯示：如果老師名相同則留空
             const originalTeacher = (prevRow && prevRow["原任老師"] === row["原任老師"]) ? "" : (row["原任老師"] || "");
             const substituteTeacher = (prevRow && prevRow["代課老師"] === row["代課老師"]) ? "" : (row["代課老師"] || "");
 
@@ -199,7 +205,6 @@
             `;
         });
 
-        // 補齊最少 4 行
         for (let i = records.length; i < 4; i++) {
             rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
         }
@@ -250,24 +255,31 @@
     }
 
     /**
-     * 更新畫面內容
+     * 更新畫面內容並判斷是否需要自動分頁
      */
     function updateDisplay() {
         const wrapper = document.getElementById('noticesWrapper');
+        const measureContainer = document.getElementById('measureContainer');
         
-        // 渲染存檔副本
-        const officeCopy = createNoticeHTML('office', '存檔副本 (Office Copy)');
-        // 渲染教師副本
-        const teacherCopy = createNoticeHTML('teacher', '教師副本 (Teacher\'s Copy)');
+        // 1. 先生成存檔副本內容進行高度測量
+        const officeCopyHtml = createNoticeHTML('存檔副本 (Office Copy)');
+        measureContainer.innerHTML = officeCopyHtml;
+        
+        // 2. 獲取高度（A4 一半大約為 500-550px 視邊距而定）
+        const officeHeight = measureContainer.offsetHeight;
+        const A4_HALF_HEIGHT = 500; 
 
-        // 判斷是否需要分頁：如果資料列超過 8 列，則強制分頁
-        const needsPageBreak = currentData.records.length > 8;
+        // 3. 根據高度決定分隔樣式
+        const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
         const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
 
+        // 4. 生成完整顯示內容
+        const teacherCopyHtml = createNoticeHTML('教師副本 (Teacher\'s Copy)');
+        
         wrapper.innerHTML = `
-            <div id="office-section">${officeCopy}</div>
+            <div id="office-section">${officeCopyHtml}</div>
             <div class="${dividerClass}"></div>
-            <div id="teacher-section">${teacherCopy}</div>
+            <div id="teacher-section">${teacherCopyHtml}</div>
         `;
     }
 
@@ -285,7 +297,6 @@
                 if (file.name.endsWith('.json')) {
                     const json = JSON.parse(content);
                     currentData = json;
-                    // 自動處理日期
                     currentData.date = formatWithDayOfWeek(currentData.date);
                 } else {
                     currentData = parseCSV(content);
@@ -313,7 +324,7 @@
         const rawDate = records[0]?.["代課日期"] || "未提供日期";
         
         return {
-            date: formatWithDayOfWeek(rawDate), // 自動處理日期
+            date: formatWithDayOfWeek(rawDate),
             refNumber: records[0]?.["處理編號"] || "SUB-NEW",
             records: records
         };
