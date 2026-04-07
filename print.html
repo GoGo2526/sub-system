@@ -222,7 +222,7 @@
 
                 <div class="flex justify-between font-bold mb-4 text-lg">
                     <div>代課日期：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1">${currentData.date}</span></div>
-                    <div>處理編號：<span class="border-b-2 border-black inline-block min-w-[150px] pb-1 text-center">${currentData.refNumber}</span></div>
+                    <div>檔案編號：<span class="border-b-2 border-black inline-block min-w-[150px] pb-1 text-center">${currentData.refNumber}</span></div>
                 </div>
 
                 <table>
@@ -312,7 +312,7 @@
         }
         return {
             date: formatWithDayOfWeek(records[0]?.["代課日期"] || ""),
-            refNumber: records[0]?.["處理編號"] || "SUB-NEW",
+            refNumber: records[0]?.["檔案編號"] || "SUB-NEW",
             records: records
         };
     }
