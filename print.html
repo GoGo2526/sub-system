@@ -150,6 +150,27 @@
     };
 
     /**
+     * 輔助函數：解析日期字串並獲取星期
+     */
+    function formatWithDayOfWeek(dateStr) {
+        if (!dateStr) return "";
+        
+        // 如果已經包含括號或「星期」，則不重複處理
+        if (dateStr.includes('(') || dateStr.includes('星期')) return dateStr;
+
+        // 嘗試清理字串並解析 (例如將「2024年5月20日」轉為日期對象)
+        const cleanDateStr = dateStr.replace('年', '-').replace('月', '-').replace('日', '');
+        const dateObj = new Date(cleanDateStr);
+        
+        if (isNaN(dateObj.getTime())) return dateStr; // 無法解析則回傳原樣
+
+        const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const dayName = days[dateObj.getDay()];
+        
+        return `${dateStr} (${dayName})`;
+    }
+
+    /**
      * 生成單份通知單的 HTML 結構
      */
     function createNoticeHTML(titleTag, typeLabel) {
@@ -234,7 +255,7 @@
         // 渲染教師副本
         const teacherCopy = createNoticeHTML('teacher', '教師副本 (Teacher\'s Copy)');
 
-        // 判斷是否需要分頁：如果資料列超過 12 列（大約高度），則強制分頁
+        // 判斷是否需要分頁：如果資料列超過 8 列，則強制分頁
         const needsPageBreak = currentData.records.length > 8;
         const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
 
@@ -259,6 +280,8 @@
                 if (file.name.endsWith('.json')) {
                     const json = JSON.parse(content);
                     currentData = json;
+                    // 自動處理日期
+                    currentData.date = formatWithDayOfWeek(currentData.date);
                 } else {
                     currentData = parseCSV(content);
                 }
@@ -282,8 +305,10 @@
             records.push(obj);
         }
 
+        const rawDate = records[0]?.["代課日期"] || "未提供日期";
+        
         return {
-            date: records[0]?.["代課日期"] || "未提供日期",
+            date: formatWithDayOfWeek(rawDate), // 自動處理日期
             refNumber: records[0]?.["處理編號"] || "SUB-NEW",
             records: records
         };
