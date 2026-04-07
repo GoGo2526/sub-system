@@ -10,37 +10,52 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: #F0F2F5;
-        }
-        /* 避免圖標加載前的閃爍 */
-        [data-lucide] { width: 1.5rem; height: 1.5rem; }
-    </style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+    body {
+        font-family: 'Noto Sans TC', sans-serif;
+        background-color: #F0F2F5;
+    }
+    /* 避免圖標加載前的閃爍 */
+    [data-lucide] { width: 1.5rem; height: 1.5rem; }
+</style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useMemo, useEffect, useRef } = React;
+ const { useState, useMemo, useEffect, useRef } = React;
 
-        // 修正後的圖標組件
+        // --- 修正後的 Icon 組件 ---
         const Icon = ({ name, className = "" }) => {
             const iconRef = useRef(null);
             
             useEffect(() => {
-                if (window.lucide) {
-                    window.lucide.createIcons({
-                        attrs: { class: className },
+                // 確保 lucide 已載入且圖標存在
+                if (window.lucide && window.lucide.icons && window.lucide.icons[name]) {
+                    // 清除舊內容避免重複掛載
+                    if (iconRef.current) {
+                        iconRef.current.innerHTML = '';
+                    }
+                    
+                    const iconPromise = window.lucide.createIcons({
+                        attrs: { class: `lucide-icon ${className}` },
                         nameAttr: 'data-lucide',
                         icons: { [name]: window.lucide.icons[name] }
                     });
                 }
             }, [name, className]);
 
-            return <i data-lucide={name} className={className} ref={iconRef}></i>;
+            // 使用 span 或 i 作為容器，並給予固定寬高避免閃爍
+            return (
+                <span 
+                    ref={iconRef} 
+                    data-lucide={name} 
+                    className={`inline-block ${className}`}
+                    style={{ width: '1em', height: '1em', verticalAlign: 'middle' }}
+                ></span>
+            );
         };
+        // -----------------------
 
 const INITIAL_RAW_DATA = {
   "mon": [
