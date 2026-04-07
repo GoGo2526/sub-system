@@ -145,8 +145,8 @@
 <div class="page-container" id="mainContent">
     <!-- 這裡會由 JS 生成兩份副本 -->
     <div id="noticesWrapper"></div>
-    <!-- 隱藏的測量容器 -->
-    <div id="measureContainer" style="position: absolute; visibility: hidden; width: 920px;"></div>
+    <!-- 隱藏的測量容器，模擬 A4 寬度以獲得正確高度 -->
+    <div id="measureContainer" style="position: absolute; visibility: hidden; width: 920px; top: -9999px;"></div>
 </div>
 
 <script>
@@ -205,6 +205,7 @@
             `;
         });
 
+        // 至少補滿 4 行
         for (let i = records.length; i < 4; i++) {
             rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
         }
@@ -261,19 +262,20 @@
         const wrapper = document.getElementById('noticesWrapper');
         const measureContainer = document.getElementById('measureContainer');
         
-        // 1. 先生成存檔副本內容進行高度測量
+        // 1. 先生成「存檔副本」內容進行高度測量
         const officeCopyHtml = createNoticeHTML('存檔副本 (Office Copy)');
         measureContainer.innerHTML = officeCopyHtml;
         
-        // 2. 獲取高度（A4 一半大約為 500-550px 視邊距而定）
+        // 2. 獲取高度（A4 紙張高度一半約為 500-550px，依邊距彈性調整）
         const officeHeight = measureContainer.offsetHeight;
         const A4_HALF_HEIGHT = 500; 
 
-        // 3. 根據高度決定分隔樣式
+        // 3. 根據測量高度決定分隔線樣式
+        // 如果內容超過一半（500px），則套用 page-break 強制分頁
         const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
         const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
 
-        // 4. 生成完整顯示內容
+        // 4. 生成教師副本並完整渲染
         const teacherCopyHtml = createNoticeHTML('教師副本 (Teacher\'s Copy)');
         
         wrapper.innerHTML = `
@@ -309,6 +311,9 @@
         reader.readAsText(file);
     }
 
+    /**
+     * CSV 解析邏輯
+     */
     function parseCSV(csvText) {
         const lines = csvText.split('\n').filter(line => line.trim() !== '');
         const headers = lines[0].split(',').map(h => h.trim());
