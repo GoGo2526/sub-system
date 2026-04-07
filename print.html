@@ -93,7 +93,8 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 1.5cm;
+                /* 設定 margin 為 0 以隱藏瀏覽器預設的頁首頁尾（如網址、日期） */
+                margin: 0;
             }
             body {
                 background-color: white;
@@ -105,7 +106,8 @@
             .page-container {
                 box-shadow: none;
                 border: none;
-                padding: 0;
+                /* 因為 @page margin 為 0，需透過 padding 確保內容不貼邊 */
+                padding: 1.5cm;
                 max-width: 100%;
             }
             /* 強制分頁 */
@@ -124,6 +126,7 @@
             th {
                 background-color: #9ca3af !important; /* 確保列印時保留底色 */
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
     </style>
@@ -271,7 +274,6 @@
         const A4_HALF_HEIGHT = 500; 
 
         // 3. 根據測量高度決定分隔線樣式
-        // 如果內容超過一半（500px），則套用 page-break 強制分頁
         const needsPageBreak = officeHeight > A4_HALF_HEIGHT;
         const dividerClass = needsPageBreak ? 'page-break' : 'copy-divider';
 
