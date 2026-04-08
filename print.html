@@ -183,7 +183,7 @@
 
     // 初始預設範例資料
     let currentData = {
-        date: "2026年4月8日",
+        date: "2026年4月8日(星期三)",
         fileNumber: "SUB-20260408",
         originalTeacher: "桂",
         absenceReason: "出外交流參觀",
@@ -200,18 +200,38 @@
         return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
     }
 
-    // 格式化日期並獲取星期
+    // 格式化日期並獲取星期，統一轉換為「年月日(星期)」格式
     function formatWithDayOfWeek(dateStr) {
         if (!dateStr) return "";
-        if (dateStr.includes('(') || dateStr.includes('星期')) return dateStr;
+        const str = String(dateStr).trim();
         
-        const cleanDate = dateStr.replace('年', '-').replace('月', '-').replace('日', '').trim();
-        const dateObj = new Date(cleanDate);
+        // 處理 Excel 匯入可能變成純數字序列號 (Serial Number) 的問題
+        if (!isNaN(str) && str !== '') {
+            const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+            const days = parseInt(str, 10);
+            const parsedDate = new Date(excelEpoch.getTime() + days * 86400000);
+            const y = parsedDate.getUTCFullYear();
+            const m = parsedDate.getUTCMonth() + 1;
+            const d = parsedDate.getUTCDate();
+            const dayOfWeek = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][parsedDate.getUTCDay()];
+            return `${y}年${m}月${d}日(${dayOfWeek})`;
+        }
+
+        // 提取字串中的年、月、日重新組裝，確保輸出格式絕對統一
+        const match = str.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+        if (match) {
+            const y = parseInt(match[1], 10);
+            const m = parseInt(match[2], 10);
+            const d = parseInt(match[3], 10);
+            
+            const dateObj = new Date(y, m - 1, d);
+            if (!isNaN(dateObj.getTime())) {
+                const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                return `${y}年${m}月${d}日(${days[dateObj.getDay()]})`;
+            }
+        }
         
-        if (isNaN(dateObj.getTime())) return dateStr;
-        
-        const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-        return `${dateStr} (${days[dateObj.getDay()]})`;
+        return str;
     }
 
     // 生成檔案編號 (強制轉換為 SUB-年月日，例如：SUB-20260408)
@@ -398,7 +418,7 @@
         const first = rows[0];
         
         return {
-            date: stripQuotes(first["代課日期"] || first["日期"] || ""),
+            date: stripQuotes(first["代課日期"] || first["教師代課日期"] || first["日期"] || ""),
             originalTeacher: stripQuotes(first["教師代號"] || first["原任老師"] || ""),
             absenceReason: stripQuotes(first["缺課原因"] || "職務需要 / 病假"),
             // 如果 Excel 裡面已經有「處理編號」就讀取，否則留空交由後續邏輯生成
