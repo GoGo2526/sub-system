@@ -162,14 +162,12 @@
     let currentData = {
         date: "2026年4月8日 (星期三)",
         fileNumber: "SUB-20260408",
-        originalTeacher: "鄺",
-        absenceReason: "校內活動",
+        originalTeacher: "桂",
+        absenceReason: "出外參觀",
         printDate: getTodayDateString(),
         records: [
-            {"原任老師": "鄺", "節數": "午膳", "班別": "4E", "科目": "午膳", "代課老師": "芬"},
-            {"原任老師": "鄺", "節數": "1", "班別": "1A", "科目": "中文", "代課老師": ""},
-            {"原任老師": "鄺", "節數": "2", "班別": "1A", "科目": "中文", "代課老師": ""},
-            {"原任老師": "鄺", "節數": "4", "班別": "2B", "科目": "常識", "代課老師": ""}
+            {"原任老師": "桂", "節數": "班主任節", "時段": "8:15 - 8:35", "班別": "5A", "科目": "班主任節", "代課老師": "李"},
+            {"原任老師": "桂", "節數": "第三節", "時段": "10:05 - 10:40", "班別": "4E", "科目": "視藝", "代課老師": "彥"}
         ]
     };
 
@@ -213,6 +211,7 @@
                 <tr>
                     <td>${originalTeacher}</td>
                     <td>${row["節數"] || ""}</td>
+                    <td>${row["時段"] || ""}</td>
                     <td>${row["班別"] || ""}</td>
                     <td>${row["科目"] || ""}</td>
                     <td>${substituteTeacher}</td>
@@ -221,7 +220,7 @@
         });
 
         for (let i = records.length; i < 4; i++) {
-            rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>';
+            rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>';
         }
 
         return `
@@ -252,11 +251,12 @@
                 <table>
                     <thead>
                         <tr>
-                            <th width="25%">原任老師</th>
-                            <th width="12%">節數</th>
-                            <th width="13%">班別</th>
-                            <th width="20%">科目</th>
-                            <th width="30%">代課老師</th>
+                            <th>原任老師</th>
+                            <th>節數</th>
+                            <th>時段</th>
+                            <th>班別</th>
+                            <th>科目</th>
+                            <th>代課老師</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
@@ -356,3 +356,4 @@
 
 </body>
 </html>
+
