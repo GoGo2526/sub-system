@@ -160,15 +160,35 @@
 <script>
     // 預設初始資料
     let currentData = {
-        date: "2024年5月20日 (星期一)",
-        refNumber: "SUB-20240520-01",
+        date: "2026年4月8日 (星期三)",
+        fileNumber: "SUB-20260408",
+        originalTeacher: "鄺",
+        absenceReason: "校內活動",
+        printDate: getTodayDateString(),
         records: [
-            {"原任老師": "陳大文 老師 (CHW)", "節數": "1", "班別": "1A", "科目": "中文", "代課老師": "張小明 老師 (CSM)"},
-            {"原任老師": "陳大文 老師 (CHW)", "節數": "2", "班別": "1A", "科目": "中文", "代課老師": ""},
-            {"原任老師": "陳大文 老師 (CHW)", "節數": "4", "班別": "2B", "科目": "常識", "代課老師": ""},
-            {"原任老師": "陳大文 老師 (CHW)", "節數": "5", "班別": "3C", "科目": "數學", "代課老師": ""}
+            {"原任老師": "鄺", "節數": "午膳", "班別": "4E", "科目": "午膳", "代課老師": "芬"},
+            {"原任老師": "鄺", "節數": "1", "班別": "1A", "科目": "中文", "代課老師": ""},
+            {"原任老師": "鄺", "節數": "2", "班別": "1A", "科目": "中文", "代課老師": ""},
+            {"原任老師": "鄺", "節數": "4", "班別": "2B", "科目": "常識", "代課老師": ""}
         ]
     };
+
+    function getTodayDateString() {
+        const d = new Date();
+        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    }
+
+    function getFormattedDateNumber(dateStr) {
+        if (!dateStr) return "SUB-NEW";
+        const match = dateStr.match(/(\d+)年(\d+)月(\d+)日/);
+        if (match) {
+            const y = match[1];
+            const m = match[2].padStart(2, '0');
+            const d = match[3].padStart(2, '0');
+            return `SUB-${y}${m}${d}`;
+        }
+        return `SUB-${dateStr.replace(/\D/g, '')}`;
+    }
 
     function formatWithDayOfWeek(dateStr) {
         if (!dateStr) return "";
@@ -220,9 +240,13 @@
                     <h2 class="text-4xl font-bold underline underline-offset-8 decoration-2">代課通知單</h2>
                 </div>
 
+                <div class="flex justify-between font-bold mb-2 text-lg">
+                    <div>原任老師：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1 text-center">${currentData.originalTeacher}</span></div>
+                    <div>代課日期：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1 text-center">${currentData.date}</span></div>
+                </div>
                 <div class="flex justify-between font-bold mb-4 text-lg">
-                    <div>代課日期：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1">${currentData.date}</span></div>
-                    <div>檔案編號：<span class="border-b-2 border-black inline-block min-w-[150px] pb-1 text-center">${currentData.refNumber}</span></div>
+                    <div>缺課原因：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1 text-center">${currentData.absenceReason}</span></div>
+                    <div>檔案編號：<span class="border-b-2 border-black inline-block min-w-[200px] pb-1 text-center">${currentData.fileNumber}</span></div>
                 </div>
 
                 <table>
@@ -243,6 +267,10 @@
                     <div class="border-2 border-black p-4 mt-2 font-normal not-italic text-sm">
                         <p>1. 請代課老師準時到達教室。</p>
                         <p>2. 如有學生缺席，請即時通知校務處。</p>
+                    </div>
+                    <div class="flex justify-between mt-8 font-bold not-italic">
+                        <div>負責老師：<span class="border-b-2 border-black inline-block min-w-[150px]"></span></div>
+                        <div>日期：<span class="border-b-2 border-black inline-block min-w-[150px] text-center">${currentData.printDate}</span></div>
                     </div>
                 </div>
             </div>
@@ -310,9 +338,15 @@
             headers.forEach((h, idx) => obj[h] = values[idx]);
             records.push(obj);
         }
+        
+        const rawDate = records[0]?.["代課日期"] || "";
+        
         return {
-            date: formatWithDayOfWeek(records[0]?.["代課日期"] || ""),
-            refNumber: records[0]?.["檔案編號"] || "SUB-NEW",
+            date: formatWithDayOfWeek(rawDate),
+            fileNumber: getFormattedDateNumber(rawDate),
+            originalTeacher: records[0]?.["原任老師"] || "",
+            absenceReason: records[0]?.["缺課原因"] || "",
+            printDate: getTodayDateString(),
             records: records
         };
     }
@@ -322,4 +356,3 @@
 
 </body>
 </html>
-
