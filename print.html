@@ -28,7 +28,7 @@
             background: white;
             width: 210mm;
             min-height: 297mm;
-            padding: 15mm;
+            padding: 15mm 15mm 15mm 15mm; /* 將上方 padding 調整為 15mm 預留版頭空間 */
             margin: 0 auto 20px auto;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             position: relative;
@@ -98,7 +98,7 @@
                 box-shadow: none;
                 margin: 0;
                 width: 100%;
-                padding: 10mm;
+                padding: 15mm 10mm 10mm 10mm; /* 列印時同樣保留 15mm 版頭空間 */
                 page-break-after: always;
             }
             .a4-page:last-child { page-break-after: auto; }
@@ -330,19 +330,17 @@
         target.innerHTML = '';
 
         allGroups.forEach(group => {
-            const page = document.createElement('div');
-            page.className = 'a4-page';
+            // 存檔副本獨立一頁
+            const officePage = document.createElement('div');
+            officePage.className = 'a4-page';
+            officePage.innerHTML = generateNoticeComponent(group, '存檔副本 (Office Copy)');
+            target.appendChild(officePage);
             
-            const officeCopy = generateNoticeComponent(group, '存檔副本 (Office Copy)');
-            const teacherCopy = generateNoticeComponent(group, '教師副本 (Teacher\'s Copy)');
-            
-            page.innerHTML = `
-                ${officeCopy}
-                <div class="cut-line"></div>
-                ${teacherCopy}
-            `;
-            
-            target.appendChild(page);
+            // 教師副本獨立一頁
+            const teacherPage = document.createElement('div');
+            teacherPage.className = 'a4-page';
+            teacherPage.innerHTML = generateNoticeComponent(group, '教師副本 (Teacher\'s Copy)');
+            target.appendChild(teacherPage);
         });
     }
 </script>
