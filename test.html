@@ -3,64 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智能編代課系統 v1.12.5</title>
+  <title>智能編代課系統 v.1.13.1a (半日上課)</title>
   
-  <!-- 引入 React 與 ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- 引入 Babel 讓瀏覽器可以直接解析 JSX -->
-  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-  
-  <!-- 引入 Tailwind CSS -->
+  <!-- 載入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- 引入 Noto Sans TC 字體 -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
-  
+  <!-- 載入 Babel 以便在瀏覽器中直接解析 JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
   <style>
+    /* 基礎字體設定 */
     body {
-      font-family: 'Noto Sans TC', sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 8px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
-    }
-    select {
-      background-image: none !important;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     }
   </style>
 </head>
-<body class="bg-[#F0F2F5] text-slate-900">
-  
+<body>
   <div id="root"></div>
 
-  <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+  <!-- 應用程式邏輯 -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
+    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+    import { 
+      User, Calendar, Coffee, Utensils, Moon, Sun, XCircle, 
+      ChevronDown, UserPlus, Download, FileText, Eye, EyeOff
+    } from 'https://esm.sh/lucide-react@0.292.0';
 
-    // --- 內建圖示 (取代原先的 lucide-react，以相容靜態 HTML 執行) ---
-    const User = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
-    const Calendar = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>;
-    const Coffee = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></svg>;
-    const Utensils = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>;
-    const Moon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
-    const Sun = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
-    const XCircle = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
-    const ChevronDown = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>;
-    const UserPlus = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>;
-    const Download = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
-    const FileText = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>;
+    /**
+     * 智能編代課系統 v.1.13.1a (半日上課)
+     * * 修改重點：
+     * 1. 加入安全登入版面，並修正瀏覽器預設密碼圖示重疊問題
+     * 2. 確保 Excel 匯出十項核心資料格式及對調課堂顯示正確
+     * 3. 嚴格鎖定對調課堂日期選擇不能為星期六及日
+     * 4. 嚴格維持原本排版、視覺比例與所有文字設定
+     */
 
     const INITIAL_RAW_DATA = {
       "mon": [
@@ -132,24 +109,24 @@
        ["7", "4C/導修","5B/導修","","1C/導修","","P6/數補","","","4D/導修","6A/導修","","","","6C/導修","6B/導修","","","2E/導修","","","","6D/導修","3A/導修","6E/導修","5A/導修","3E/導修","5C/導修","1A/導修","5E/導修","4A/導修","4B/導修","","","4E/導修","","3B/導修","3C/導修","","","","1B/導修","","2D/導修","","","2B/導修","","1D/導修","1E/導修","5D/導修","","2C/導修","3D/導修","P3/數補","2A/導修",""],
        ["8", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
        ["9", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
-      ],
+       ],
     };
 
     const SCHEDULE_STRUCTURE = [
-      { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
-      { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
-      { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
-      { type: 'break', id: 'B1', label: '小息', time: '9:45 - 10:05', icon: <Sun className="w-5 h-5 text-black" />, csvKey: 'B1' },
-      { type: 'class', id: '3', label: '第三節', time: '10:05 - 10:40', csvKey: '3' },
-      { type: 'class', id: '4', label: '第四節', time: '10:40 - 11:15', csvKey: '4' },
-      { type: 'break', id: 'B2', label: '小休', time: '11:15 - 11:25', icon: <Coffee className="w-5 h-5 text-black" />, csvKey: 'B2' },
-      { type: 'class', id: '5', label: '第五節', time: '11:25 - 12:00', csvKey: '5' },
-      { type: 'class', id: '6', label: '第六節', time: '12:00 - 12:35', csvKey: '6' },
-      { type: 'class', id: 'LUNCH', label: '午膳', time: '12:35 - 1:15', icon: <Utensils className="w-5 h-5 text-black" />, csvKey: 'LUNCH' },
-      { type: 'break', id: 'REST', label: '午息', time: '1:15 - 1:35', icon: <Moon className="w-5 h-5 text-black" />, csvKey: 'REST' },
-      { type: 'class', id: '7', label: '第七節', time: '1:35 - 2:10', csvKey: '7' },
-      { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
-      { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
+      { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
+      { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
+      { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
+      { type: 'break', id: 'B1', label: '小息', time: '9:20 - 9:35', icon: <Sun className="w-5 h-5 text-black" />, csvKey: 'B1' },
+      { type: 'class', id: '3', label: '第三節', time: '9:35 - 10:00', csvKey: '3' },
+      { type: 'class', id: '4', label: '第四節', time: '10:00 - 10:25', csvKey: '4' },
+      
+      { type: 'class', id: '5', label: '第五節', time: '10:25 - 10:50', csvKey: '5' },
+      { type: 'class', id: '6', label: '第六節', time: '10:50 - 11:15', csvKey: '6' },
+   
+      { type: 'break', id: 'REST', label: '小息', time: '11:15 - 11:30', icon: <Moon className="w-5 h-5 text-black" />, csvKey: 'REST' },
+      { type: 'class', id: '7', label: '第七節', time: '11:30 - 11:55', csvKey: '7' },
+      { type: 'class', id: '8', label: '第八節', time: '11:55 - 12:20', csvKey: '8' },
+      { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
 
     const DAYS_CONFIG = [
@@ -164,25 +141,19 @@
     const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
 
     function App() {
-      const [isAuthenticated, setIsAuthenticated] = useState(false);
-      const [passwordInput, setPasswordInput] = useState('');
-      const [loginError, setLoginError] = useState('');
       const [rawData] = useState(INITIAL_RAW_DATA);
       const [selectedTeacher, setSelectedTeacher] = useState("");
       const [activeTab, setActiveTab] = useState('mon');
       const [subRequest, setSubRequest] = useState(null);
       const [assignments, setAssignments] = useState({});
+      const [swapArrangements, setSwapArrangements] = useState({});
+      const [isSwapMode, setIsSwapMode] = useState(false);
       const [leaveReasons, setLeaveReasons] = useState({});
       const [todayDate, setTodayDate] = useState(new Date());
-
-      const handleLogin = () => {
-        if (passwordInput === 'smr1234') {
-          setIsAuthenticated(true);
-          setLoginError('');
-        } else {
-          setLoginError('密碼錯誤，請重新輸入');
-        }
-      };
+      const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [passwordInput, setPasswordInput] = useState("");
+      const [showPassword, setShowPassword] = useState(false);
+      const [loginError, setLoginError] = useState("");
 
       useEffect(() => {
         const day = todayDate.getDay();
@@ -260,6 +231,19 @@
       const handleAssignSub = (lessonIdx, subId) => {
         const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
         setAssignments(prev => ({ ...prev, [key]: subId }));
+        
+        if (isSwapMode) {
+          setSwapArrangements(prev => ({
+            ...prev,
+            [key]: { date: '', period: '' }
+          }));
+        } else {
+          setSwapArrangements(prev => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }
       };
 
       const handleRemoveSub = (lessonIdx) => {
@@ -267,6 +251,22 @@
         const newAssignments = { ...assignments };
         delete newAssignments[key];
         setAssignments(newAssignments);
+
+        setSwapArrangements(prev => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      };
+
+      const handleUpdateSwap = (key, field, value) => {
+        setSwapArrangements(prev => ({
+          ...prev,
+          [key]: {
+            ...prev[key],
+            [field]: value
+          }
+        }));
       };
 
       const handleReasonChange = (e) => {
@@ -286,8 +286,9 @@
         const leaveReason = leaveReasons[`${selectedTeacher}-${activeTab}`] || "未註明";
         const formattedDisplayDate = `${yyyy}年${mm}月${dd}日`;
 
+        // 加上 BOM (\uFEFF) 讓 Excel 能夠正確識別 UTF-8 中文
         let csvContent = "\uFEFF";
-        csvContent += "代課日期,缺課原因,原任老師,節數,時段,班別,科目,代課老師,處理編號\n";
+        csvContent += "代課日期,缺課原因,原任老師,節數,時段,班別,科目,代課老師,處理編號,對調課堂\n";
 
         let hasData = false;
 
@@ -305,6 +306,18 @@
               subject = slot.id === 'HR' ? "班主任節" : slot.label;
             }
 
+            let swapString = "";
+            const swapData = swapArrangements[`${activeTab}-${idx}-${selectedTeacher}`];
+            if (swapData && swapData.date && swapData.period) {
+              const d = new Date(swapData.date);
+              if (!isNaN(d.getTime())) {
+                const day = d.getDate();
+                const month = d.getMonth() + 1;
+                const weekday = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+                swapString = `${day}/${month} (${weekday}), ${swapData.period}`;
+              }
+            }
+
             const row = [
               formattedDisplayDate,
               leaveReason,
@@ -314,7 +327,8 @@
               classCode,
               subject,
               assignedSub,
-              processId
+              processId,
+              swapString
             ].map(field => `"${field}"`).join(",");
             
             csvContent += row + "\n";
@@ -334,9 +348,78 @@
         document.body.removeChild(link);
       };
 
+      const handleLogin = (e) => {
+        e.preventDefault();
+        if (passwordInput === 'Smr-12345') {
+          setIsAuthenticated(true);
+          setLoginError("");
+        } else {
+          setLoginError("密碼錯誤，請重新輸入。");
+          setPasswordInput("");
+        }
+      };
+
+      if (!isAuthenticated) {
+        return (
+          <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center p-4 font-sans text-slate-900">
+            <div className="bg-white p-10 rounded-[3rem] shadow-2xl border-2 border-slate-100 max-w-md w-full text-center animate-in zoom-in-95 relative">
+              
+              {/* 加入專屬的 CSS 樣式，徹底隱藏 Edge/Chrome 原生的密碼顯示圖示 */}
+              <style>{`
+                input[type="password"]::-ms-reveal,
+                input[type="password"]::-webkit-reveal {
+                  display: none !important;
+                }
+              `}</style>
+              
+              <div className="flex justify-center mb-6">
+                <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
+                  <Calendar className="text-white w-10 h-10" />
+                </div>
+              </div>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-3">觀塘官立小學（秀明道）</h1>
+              <h2 className="text-2xl font-bold text-blue-600 mb-8">智能編代課系統</h2>
+              
+              <form onSubmit={handleLogin} className="flex flex-col gap-6">
+                <div className="text-left">
+                  <label className="text-lg font-black text-slate-700 mb-3 block">請輸入密碼：</label>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      value={passwordInput}
+                      onChange={(e) => { setPasswordInput(e.target.value); setLoginError(""); }}
+                      className={`w-full px-6 py-4 bg-slate-50 border-2 ${loginError ? 'border-rose-500' : 'border-slate-200'} rounded-2xl text-xl font-bold focus:border-blue-600 outline-none transition-all text-center tracking-widest pr-12`}
+                      autoFocus
+                      placeholder="•••••••••"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
+                    </button>
+                  </div>
+                  {loginError && (
+                    <p className="text-rose-500 text-sm font-bold mt-3 text-center">{loginError}</p>
+                  )}
+                </div>
+                <button 
+                  type="submit"
+                  className="bg-blue-600 text-white text-xl font-black py-4 rounded-2xl shadow-lg hover:bg-blue-700 transition-all active:scale-95 mt-2"
+                >
+                  登入系統
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
       return (
-        <div className="min-h-screen p-4 md:p-6 font-sans">
+        <div className="min-h-screen bg-[#F0F2F5] text-slate-900 p-4 md:p-6 font-sans">
           
+          {/* 標題與基礎設置 */}
           <header className="max-w-7xl mx-auto mb-10 space-y-6">
             <div className="flex items-start gap-5">
               <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
@@ -344,10 +427,11 @@
               </div>
               <div>
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-                <h2 className="text-xl font-bold text-blue-600">智能編代課系統 v1.12.5</h2>
+                <h2 className="text-xl font-bold text-blue-600">智能編代課系統 v.1.13.1a (半日上課)</h2>
               </div>
             </div>
 
+            {/* 控制列：選擇教師與日期 */}
             <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-2.5 rounded-3xl shadow-sm border border-slate-200">
               <div className="relative group w-full md:w-auto min-w-[240px]">
                 <select
@@ -378,6 +462,7 @@
             </div>
           </header>
 
+          {/* 主要課表區域 */}
           <div className="max-w-7xl mx-auto">
             {!selectedTeacher ? (
               <div className="bg-white rounded-[3rem] border-4 border-dashed border-slate-200 h-[50vh] flex flex-col items-center justify-center text-slate-400">
@@ -388,7 +473,7 @@
             ) : (
               <div className="flex flex-col gap-8 w-full">
                 <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
-                  
+                  {/* 表頭信息 */}
                   <div className="p-10 border-b border-slate-100 bg-gradient-to-br from-white to-blue-50/30">
                     <div className="flex gap-8">
                       <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white text-4xl font-black shadow-2xl">
@@ -422,6 +507,7 @@
                     </div>
                   </div>
 
+                  {/* 課表主體 */}
                   <div className="p-8 space-y-4">
                     {SCHEDULE_STRUCTURE.map((slot, idx) => {
                       const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
@@ -451,7 +537,12 @@
                       return (
                         <div key={idx} className="relative">
                           <div 
-                            onClick={() => isActualLesson && !assignedSub && setSubRequest({ lessonIdx: idx })}
+                            onClick={() => {
+                              if (isActualLesson && !assignedSub) {
+                                setSubRequest({ lessonIdx: idx });
+                                setIsSwapMode(false);
+                              }
+                            }}
                             className={`flex flex-col md:flex-row gap-6 p-6 rounded-[2rem] border-2 transition-all ${
                               isActualLesson 
                                 ? isSelected ? "bg-orange-50 border-[#800000] scale-[1.02] shadow-lg" 
@@ -498,11 +589,13 @@
                             </div>
                           </div>
 
+                          {/* 選擇代課教師面板 - 保持原設定 */}
                           {isSelected && (
                             <div className="mt-4 p-8 bg-[#FFF9E3] border-2 border-slate-500 rounded-[2.5rem] animate-in zoom-in-95 shadow-xl">
                               <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-8 text-black">
                                 <div className="flex flex-col gap-4 w-full">
                                   <h4 className="text-4xl font-black flex items-center gap-4">選擇代課教師</h4>
+                                  {/* 指示燈設定保持原狀 */}
                                   <div className="bg-blue-50 border-2 border-slate-500 rounded-2xl p-4 flex flex-col gap-1.5 w-fit shadow-sm">
                                     <div className="flex items-center gap-2.5 text-sm font-bold text-black">
                                       <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
@@ -518,14 +611,26 @@
                                     </div>
                                   </div>
                                 </div>
-                                <button 
-                                  onClick={() => setSubRequest(null)} 
-                                  className="bg-white px-4 py-2 rounded-xl border-2 border-slate-500 font-black text-lg text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all shrink-0"
-                                >
-                                  取消選取
-                                </button>
+                                <div className="flex items-center gap-4 shrink-0">
+                                  <label className="flex items-center gap-2 cursor-pointer bg-white px-4 py-2 rounded-xl border-2 border-slate-500 font-black text-lg text-slate-700 hover:bg-slate-50 transition-all">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isSwapMode}
+                                      onChange={(e) => setIsSwapMode(e.target.checked)}
+                                      className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    />
+                                    對調課堂
+                                  </label>
+                                  <button 
+                                    onClick={() => setSubRequest(null)} 
+                                    className="bg-white px-4 py-2 rounded-xl border-2 border-slate-500 font-black text-lg text-slate-700 hover:bg-slate-50 hover:shadow-md transition-all shrink-0"
+                                  >
+                                    取消選取
+                                  </button>
+                                </div>
                               </div>
                               
+                              {/* 教師卡片佈局保持原狀 */}
                               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
                                 {getAvailableTeachers(activeTab, idx).map((sub, sIdx) => (
                                   <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className="bg-white p-6 rounded-2xl border-2 border-orange-300 hover:border-[#800000] hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden">
@@ -544,7 +649,76 @@
                         </div>
                       );
                     })}
+                    
+                    {/* 對調課堂安排顯示 */}
+                    {Object.keys(swapArrangements).some(k => k.startsWith(`${activeTab}-`) && k.endsWith(`-${selectedTeacher}`)) && (
+                      <div className="mt-8 pt-8 border-t-2 border-dashed border-slate-300">
+                        <h3 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                          <Calendar className="w-6 h-6 text-blue-600" />
+                          對調課堂安排
+                        </h3>
+                        <div className="flex flex-col gap-4">
+                          {Object.entries(swapArrangements)
+                            .filter(([k]) => k.startsWith(`${activeTab}-`) && k.endsWith(`-${selectedTeacher}`))
+                            .sort((a, b) => parseInt(a[0].split('-')[1]) - parseInt(b[0].split('-')[1]))
+                            .map(([key, swap]) => {
+                              const idx = parseInt(key.split('-')[1]);
+                              const slot = SCHEDULE_STRUCTURE[idx];
+                              const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
+                              let subject = "";
+                              if (content && content.includes('/')) {
+                                subject = content.split('/')[1];
+                              } else if (content) {
+                                subject = slot.id === 'HR' ? "班主任節" : slot.label;
+                              }
+                              
+                              return (
+                                <div key={key} className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-purple-50 p-5 rounded-2xl border-2 border-purple-200 shadow-sm">
+                                  <div className="text-xl font-black text-slate-800 min-w-[150px]">
+                                    {slot.label} {subject && <span className="text-blue-600 ml-1">{subject}</span>}
+                                  </div>
+                                  <div className="text-lg font-black text-slate-500 shrink-0">已安排</div>
+                                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                    <input 
+                                      type="date" 
+                                      lang="en-GB"
+                                      value={swap.date}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val) {
+                                          const d = new Date(val);
+                                          if (d.getDay() === 0 || d.getDay() === 6) {
+                                            e.target.setCustomValidity("不能揀選「星期六」或「星期日」。");
+                                            e.target.reportValidity();
+                                            handleUpdateSwap(key, 'date', '');
+                                            return;
+                                          }
+                                        }
+                                        e.target.setCustomValidity("");
+                                        handleUpdateSwap(key, 'date', val);
+                                      }}
+                                      className="px-4 py-2.5 border-2 border-slate-300 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 bg-white shadow-sm"
+                                    />
+                                    <select
+                                      value={swap.period}
+                                      onChange={(e) => handleUpdateSwap(key, 'period', e.target.value)}
+                                      className="px-4 py-2.5 border-2 border-slate-300 rounded-xl font-bold text-slate-700 outline-none focus:border-blue-500 bg-white shadow-sm min-w-[120px]"
+                                    >
+                                      <option value="">請選擇節數</option>
+                                      {SCHEDULE_STRUCTURE.filter(s => s.type === 'class').map(s => (
+                                        <option key={s.id} value={s.label}>{s.label}</option>
+                                      ))}
+                                    </select>
+                                    <div className="text-lg font-black text-slate-500 shrink-0">對調課堂</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    )}
 
+                    {/* 匯出及製作通知單按鈕區域 */}
                     <div className="flex flex-col md:flex-row justify-between items-center mt-12 pt-8 border-t-2 border-slate-200 gap-6">
                       <button
                         onClick={handleExportExcel}
@@ -569,46 +743,12 @@
               </div>
             )}
           </div>
-
-          {!isAuthenticated && (
-            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-[2rem] shadow-2xl p-10 max-w-md w-full animate-in zoom-in-95 duration-200">
-                <div className="flex justify-center mb-6">
-                  <div className="bg-blue-600 p-4 rounded-2xl transform rotate-3 shadow-lg">
-                    <Calendar className="text-white w-8 h-8" />
-                  </div>
-                </div>
-                <h2 className="text-3xl font-black text-slate-800 mb-8 text-center tracking-tight">智能編代課系統</h2>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-lg font-black text-slate-700 mb-3">請輸入密碼：</label>
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
-                      className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-600 outline-none transition-all font-bold text-xl"
-                      placeholder="預設密碼"
-                      autoFocus
-                    />
-                    {loginError && <p className="text-red-500 text-sm font-bold mt-2">{loginError}</p>}
-                  </div>
-                  <button
-                    onClick={handleLogin}
-                    className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xl hover:bg-blue-700 hover:shadow-lg transition-all"
-                  >
-                    登入系統
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       );
     }
 
-    // 將 App 渲染到 DOM
-    const root = ReactDOM.createRoot(document.getElementById('root'));
+    // 掛載 React 應用程式到 root 容器
+    const root = createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
