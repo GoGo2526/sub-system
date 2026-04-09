@@ -5,168 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>代課通知單系統 - 觀塘官立小學(秀明道)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 SheetJS 以支援 Excel 檔案解析 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
 
         body {
             font-family: 'Noto Sans TC', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f0f2f5;
             margin: 0;
-            padding: 20px;
             color: #1a1a1a;
         }
 
-        /* 容器樣式 */
-        .page-container {
+        /* 預覽容器 */
+        .preview-area {
             max-width: 900px;
-            margin: 0 auto;
+            margin: 20px auto;
+            padding: 0;
+        }
+
+        /* A4 紙張樣式 (預覽用) */
+        .a4-page {
             background: white;
-            padding: 40px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            min-height: 29.7cm; /* A4 高度參考 */
-        }
-
-        /* 通知單卡片 */
-        .notice-card {
-            background-color: white;
-            width: 100%;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 15mm;
+            margin: 0 auto 20px auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             position: relative;
+            box-sizing: border-box;
         }
 
-        /* 標頭樣式 */
+        /* 校名標頭 */
         .school-header {
             border-bottom: 3px solid black;
-            padding-bottom: 12px;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-bottom: 24px;
         }
 
-        /* 表格樣式 - 移除 table-layout: fixed 以實現自動調節寬度 */
+        /* 表格樣式 */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            margin: 15px 0;
         }
 
         th, td {
             border: 2px solid black;
-            padding: 12px 8px;
+            padding: 8px 6px;
             text-align: center;
             font-weight: bold;
-            font-size: 16px;
-            word-wrap: break-word;
+            font-size: 15px;
         }
 
         th {
-            background-color: #9ca3af !important; /* Tailwind gray-400 */
+            background-color: #d1d5db !important;
             color: black;
-            text-transform: uppercase;
         }
 
-        /* 虛線分隔 */
-        .copy-divider {
-            border-top: 2px dashed #999;
-            margin: 50px 0;
+        /* 虛線剪裁線 */
+        .cut-line {
+            border-top: 1px dashed #000;
+            margin: 30px 0;
             position: relative;
-            height: 1px;
         }
-        .copy-divider::after {
-            content: "✂️ 剪裁線 (Cut along the line)";
+        .cut-line::after {
+            content: "✂️ 剪裁線 (Office & Teacher Copy Divider)";
             position: absolute;
             right: 0;
-            top: -14px;
-            font-size: 12px;
-            color: #666;
+            top: -12px;
+            font-size: 11px;
             background: white;
-            padding-left: 15px;
+            padding: 0 10px;
         }
 
-        /* 按鈕樣式 */
-        .action-btn {
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
+        /* 控制列 */
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid #e5e7eb;
         }
 
-        /* 列印特定樣式 */
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 0;
-            }
-            body {
-                background-color: white;
-                padding: 0;
-                margin: 0;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .page-container {
+            body { background: white; padding: 0; }
+            .no-print { display: none !important; }
+            .a4-page {
                 box-shadow: none;
-                border: none;
-                padding: 1.5cm;
-                max-width: 100%;
-                width: 100%;
-            }
-            .page-break {
-                page-break-before: always;
-                height: 0;
                 margin: 0;
-                border: none;
+                width: 100%;
+                padding: 10mm;
+                page-break-after: always;
             }
-            .second-page-padding {
-                padding-top: 2cm;
-            }
-            th {
-                background-color: #9ca3af !important;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            .copy-divider {
-                border-top: 1px dashed #000;
-            }
+            .a4-page:last-child { page-break-after: auto; }
+            th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
 <body>
 
-<!-- 頂部操作列 -->
-<div class="no-print flex justify-between items-center max-w-[900px] mx-auto mb-6 p-4 bg-white rounded-lg shadow-sm">
-    <div class="flex gap-4">
-        <!-- 增加 accept 屬性以支援 excel 格式 -->
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.json,.csv" class="hidden" onchange="handleFileUpload(event)">
-        <button class="action-btn bg-sky-50 text-sky-700 border border-sky-200 px-4 py-2 rounded-md hover:bg-sky-100" onclick="document.getElementById('fileInput').click()">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            匯入 Excel/CSV
-        </button>
-    </div>
-    
-    <div class="flex gap-3">
-        <button onclick="window.print()" class="action-btn bg-gray-900 text-white px-6 py-2 rounded-md hover:bg-gray-800 shadow-md">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            列印通知單
-        </button>
+<div class="toolbar no-print p-4 shadow-sm mb-4">
+    <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold">代課通知單系統</h1>
+                <p class="text-xs text-gray-500">觀塘官立小學(秀明道)</p>
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleFile(event)">
+            <button onclick="document.getElementById('fileInput').click()" class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition font-medium text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                匯入資料
+            </button>
+            <button onclick="window.print()" class="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition font-medium text-sm shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                列印通知單
+            </button>
+        </div>
     </div>
 </div>
 
-<div class="page-container" id="mainContent">
-    <div id="noticesWrapper">
-        <!-- JS 動態生成內容 -->
+<div id="loading" class="no-print hidden fixed inset-0 bg-black bg-opacity-20 z-50 flex items-center justify-center">
+    <div class="bg-white p-4 rounded-lg shadow-xl flex items-center gap-3">
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        <span class="font-medium">正在處理資料...</span>
     </div>
-    <!-- 用於計算高度的測量層 -->
-    <div id="measureContainer" style="position: absolute; visibility: hidden; width: 820px; top: -9999px;"></div>
+</div>
+
+<div id="renderTarget" class="preview-area">
+    <!-- 動態生成的內容將放在這裡 -->
+    <div class="no-print text-center py-20 text-gray-400">
+        <p>尚未匯入資料，請點擊上方「匯入資料」按鈕開始。</p>
+        <p class="text-sm mt-2">支援 .xlsx 或 .csv 格式</p>
+    </div>
 </div>
 
 <script>
-    // 預設時段對應表 (根據小學常見時間設定，可隨時修改)
-    const periodTimes = {
+    const PERIOD_TIMES = {
         "班主任節": "08:15 - 08:35",
         "第一節": "08:35 - 09:10",
         "第二節": "09:10 - 09:45",
@@ -181,315 +165,186 @@
         "第九節": "14:30 - 15:05"
     };
 
-    // 初始預設範例資料
-    let currentData = {
-        date: "2026年4月8日(星期三)",
-        fileNumber: "SUB-20260408",
-        originalTeacher: "桂",
-        absenceReason: "出外交流參觀",
-        printDate: getTodayDateString(),
-        records: [
-            {"原任老師": "桂", "節數": "班主任節", "時段": "08:15 - 08:35", "班別": "5A", "科目": "班主任節", "代課老師": "李"},
-            {"原任老師": "桂", "節數": "第一節", "時段": "08:35 - 09:10", "班別": "5A", "科目": "中文", "代課老師": "張"},
-            {"原任老師": "桂", "節數": "第三節", "時段": "10:05 - 10:40", "班別": "4E", "科目": "視藝", "代課老師": "彥"}
-        ]
-    };
-
-    function getTodayDateString() {
-        const d = new Date();
-        return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-    }
-
-    // 格式化日期並獲取星期，統一轉換為「年月日(星期)」格式
-    function formatWithDayOfWeek(dateStr) {
-        if (!dateStr) return "";
-        const str = String(dateStr).trim();
+    function formatDateWithDay(dateInput) {
+        if (!dateInput) return "";
+        let date;
         
-        // 處理 Excel 匯入可能變成純數字序列號 (Serial Number) 的問題
-        if (!isNaN(str) && str !== '') {
-            const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-            const days = parseInt(str, 10);
-            const parsedDate = new Date(excelEpoch.getTime() + days * 86400000);
-            const y = parsedDate.getUTCFullYear();
-            const m = parsedDate.getUTCMonth() + 1;
-            const d = parsedDate.getUTCDate();
-            const dayOfWeek = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][parsedDate.getUTCDay()];
-            return `${y}年${m}月${d}日(${dayOfWeek})`;
+        // 處理 Excel 序列號
+        if (!isNaN(dateInput) && typeof dateInput === 'number') {
+            date = new Date((dateInput - 25569) * 86400 * 1000);
+        } else {
+            // 嘗試解析日期字串
+            const cleanDate = String(dateInput).replace(/年|月/g, '-').replace(/日/g, '');
+            date = new Date(cleanDate);
         }
 
-        // 提取字串中的年、月、日重新組裝，確保輸出格式絕對統一
-        const match = str.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-        if (match) {
-            const y = parseInt(match[1], 10);
-            const m = parseInt(match[2], 10);
-            const d = parseInt(match[3], 10);
+        if (isNaN(date.getTime())) return String(dateInput);
+
+        const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+        const y = date.getFullYear();
+        const m = date.getMonth() + 1;
+        const d = date.getDate();
+        return `${y}年${m}月${d}日 (${days[date.getDay()]})`;
+    }
+
+    function getFileId(dateStr) {
+        const nums = String(dateStr).replace(/\D/g, '');
+        return `SUB-${nums.substring(0, 8) || 'NEW'}`;
+    }
+
+    async function handleFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        document.getElementById('loading').classList.remove('hidden');
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                renderNotices(processData(jsonData));
+            } catch (err) {
+                console.error(err);
+                alert('讀取檔案失敗，請確保 Excel 格式正確且包含必要的標題列。');
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    function processData(rows) {
+        // 將資料按「原任老師」和「日期」進行分群
+        const groups = {};
+        
+        rows.forEach(row => {
+            const teacher = row["原任老師"] || row["教師名稱"] || "未知老師";
+            const date = row["代課日期"] || row["日期"] || new Date().toLocaleDateString();
+            const key = `${teacher}_${date}`;
             
-            const dateObj = new Date(y, m - 1, d);
-            if (!isNaN(dateObj.getTime())) {
-                const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-                return `${y}年${m}月${d}日(${days[dateObj.getDay()]})`;
+            if (!groups[key]) {
+                groups[key] = {
+                    originalTeacher: teacher,
+                    date: formatDateWithDay(date),
+                    fileNumber: row["處理編號"] || getFileId(date),
+                    absenceReason: row["缺課原因"] || "職務需要",
+                    records: []
+                };
             }
-        }
-        
-        return str;
-    }
+            
+            let period = row["節數"] || "";
+            let time = row["時段"] || PERIOD_TIMES[period] || "";
 
-    // 生成檔案編號 (強制轉換為 SUB-年月日，例如：SUB-20260408)
-    function generateFileNumber(dateStr) {
-        // 嘗試找出 YYYY-MM-DD 或 YYYY年MM月DD日 格式
-        const match = dateStr.match(/(\d{4}).*?(\d{1,2}).*?(\d{1,2})/);
-        if (match) {
-            const y = match[1];
-            const m = match[2].padStart(2, '0');
-            const d = match[3].padStart(2, '0');
-            return `SUB-${y}${m}${d}`;
-        }
-        // 如果找不到標準日期，提取純數字
-        const numbers = dateStr.replace(/\D/g, '');
-        return `SUB-${numbers || 'NEW'}`;
-    }
-
-    // 清除字串前後的雙引號
-    function stripQuotes(str) {
-        if (typeof str !== 'string') return str;
-        let cleaned = str.trim();
-        // 移除開頭和結尾的雙引號
-        if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-            cleaned = cleaned.substring(1, cleaned.length - 1);
-        }
-        return cleaned;
-    }
-
-    // 生成單份通知單的 HTML
-    function createNoticeHTML(typeLabel) {
-        const records = currentData.records || [];
-        let rowsHtml = '';
-        
-        // 渲染表格行
-        records.forEach((row, index) => {
-            rowsHtml += `
-                <tr>
-                    <td class="whitespace-nowrap">${row["原任老師"] || ""}</td>
-                    <td class="whitespace-nowrap">${row["節數"] || ""}</td>
-                    <td class="whitespace-nowrap">${row["時段"] || ""}</td>
-                    <td class="whitespace-nowrap">${row["班別"] || ""}</td>
-                    <td>${row["科目"] || ""}</td>
-                    <td class="whitespace-nowrap">${row["代課老師"] || ""}</td>
-                </tr>
-            `;
+            groups[key].records.push({
+                period: period,
+                time: time,
+                className: row["班別"] || "",
+                subject: row["科目"] || "",
+                subTeacher: row["代課老師"] || "",
+                swappedClass: row["對調課堂"] || ""
+            });
         });
+        
+        return Object.values(groups);
+    }
 
-        // 填充空白行（確保表格有基本高度，最少 4 行）
-        const minRows = 4;
-        if (records.length < minRows) {
-            for (let i = records.length; i < minRows; i++) {
-                rowsHtml += '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>';
-            }
-        }
+    function generateNoticeComponent(data, typeLabel) {
+        const rows = data.records.map(r => `
+            <tr>
+                <td class="whitespace-nowrap">${data.originalTeacher}</td>
+                <td class="whitespace-nowrap">${r.period}</td>
+                <td class="whitespace-nowrap">${r.time}</td>
+                <td class="whitespace-nowrap">${r.className}</td>
+                <td class="whitespace-nowrap">${r.subject}</td>
+                <td class="whitespace-nowrap">${r.subTeacher}</td>
+                <td class="whitespace-nowrap">${r.swappedClass}</td>
+            </tr>
+        `).join('');
+
+        // 填充空白行以維持美觀
+        const emptyRowsNeeded = Math.max(0, 4 - data.records.length);
+        const emptyRows = Array(emptyRowsNeeded).fill('<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('');
 
         return `
-            <div class="notice-card">
+            <div class="notice-section">
                 <div class="school-header">
                     <div>
-                        <h1 class="text-2xl font-black">觀塘官立小學(秀明道)</h1>
-                        <p class="text-sm font-bold tracking-tight">KWUN TONG GOVERNMENT PRIMARY SCHOOL (SAU MING ROAD)</p>
+                        <h2 class="text-xl font-black">觀塘官立小學(秀明道)</h2>
+                        <p class="text-[10px] font-bold tracking-tighter">KWUN TONG GOVERNMENT PRIMARY SCHOOL (SAU MING ROAD)</p>
                     </div>
-                    <div class="border-2 border-black px-3 py-1 text-base font-bold bg-gray-50">
+                    <div class="border-2 border-black px-2 py-0.5 text-xs font-bold bg-gray-100">
                         ${typeLabel}
                     </div>
                 </div>
 
-                <div class="text-center my-8">
-                    <h2 class="text-4xl font-black">代課通知單</h2>
+                <div class="text-center my-4">
+                    <h3 class="text-3xl font-black underline decoration-2 underline-offset-4">代課通知單</h3>
                 </div>
 
-                <div class="grid grid-cols-2 gap-y-4 mb-6 text-lg font-bold">
-                    <div class="flex items-end">原任老師：<span class="border-b-2 border-black flex-1 text-center px-2 pb-1 mx-2">${currentData.originalTeacher}</span></div>
-                    <div class="flex items-end">代課日期：<span class="border-b-2 border-black flex-1 text-center px-2 pb-1 mx-2">${currentData.date}</span></div>
-                    <div class="flex items-end">缺課原因：<span class="border-b-2 border-black flex-1 text-center px-2 pb-1 mx-2">${currentData.absenceReason}</span></div>
-                    <div class="flex items-end">檔案編號：<span class="border-b-2 border-black flex-1 text-center px-2 pb-1 mx-2">${currentData.fileNumber}</span></div>
+                <div class="grid grid-cols-2 gap-x-8 gap-y-3 mb-4 text-sm font-bold">
+                    <div class="flex items-end">原任老師：<span class="border-b border-black flex-1 text-center pb-0.5 ml-1">${data.originalTeacher}</span></div>
+                    <div class="flex items-end">代課日期：<span class="border-b border-black flex-1 text-center pb-0.5 ml-1">${data.date}</span></div>
+                    <div class="flex items-end">缺課原因：<span class="border-b border-black flex-1 text-center pb-0.5 ml-1">${data.absenceReason}</span></div>
+                    <div class="flex items-end">檔案編號：<span class="border-b border-black flex-1 text-center pb-0.5 ml-1">${data.fileNumber}</span></div>
                 </div>
 
                 <table>
                     <thead>
                         <tr>
-                            <!-- 移除固定寬度，讓表格根據內容自動伸縮 -->
-                            <th>原任老師</th>
-                            <th>節數</th>
-                            <th>時段</th>
-                            <th>班別</th>
-                            <th>科目</th>
-                            <th>代課老師</th>
+                            <th class="whitespace-nowrap">原任老師</th>
+                            <th class="whitespace-nowrap">節數</th>
+                            <th class="whitespace-nowrap">時段</th>
+                            <th class="whitespace-nowrap">班別</th>
+                            <th class="whitespace-nowrap">科目</th>
+                            <th class="whitespace-nowrap">代課老師</th>
+                            <th class="whitespace-nowrap">對調課堂</th>
                         </tr>
                     </thead>
-                    <tbody>${rowsHtml}</tbody>
+                    <tbody>
+                        ${rows}
+                        ${emptyRows}
+                    </tbody>
                 </table>
 
-                <div class="mt-8 font-bold italic">
-                    <p class="mb-2">備註 / 注意事項：</p>
-                    <div class="border-2 border-black p-4 font-normal not-italic leading-relaxed">
-                        <p>1. 請代課老師準時到達教室。</p>
-                        <p>2. 如有學生缺席，請盡快通知校務處。</p>
+                <div class="mt-4 text-sm font-bold">
+                    <p class="mb-1">備註 / 注意事項：</p>
+                    <div class="border border-black p-2 font-normal leading-relaxed text-xs">
+                        <p>1. 代課老師請按時到達課室教學/監管學生。</p>
+                        <p>2. 如代課期間有任何突發事項，請即時聯絡校務處或行政組負責老師。</p>
                     </div>
-                    <div class="flex justify-between mt-12 font-bold not-italic text-lg">
-                        <div class="flex items-end">負責老師簽署：<span class="border-b-2 border-black min-w-[180px] inline-block ml-2"></span></div>
-                        <div class="flex items-end">列印日期：<span class="border-b-2 border-black min-w-[150px] inline-block ml-2 text-center">${currentData.printDate}</span></div>
+                    <div class="flex justify-between mt-8 text-sm">
+                        <div class="flex items-end">負責老師簽署：<span class="border-b border-black w-32 inline-block ml-1"></span></div>
+                        <div class="flex items-end">列印日期：<span class="border-b border-black w-32 inline-block ml-1 text-center">${new Date().toLocaleDateString('zh-HK')}</span></div>
                     </div>
                 </div>
             </div>
         `;
     }
 
-    function updateDisplay() {
-        const wrapper = document.getElementById('noticesWrapper');
-        const measure = document.getElementById('measureContainer');
-        
-        // 渲染單份並測量高度
-        const contentHtml = createNoticeHTML('存檔副本 (Office Copy)');
-        measure.innerHTML = contentHtml;
-        const cardHeight = measure.offsetHeight;
-        
-        // A4 頁面可用高度大約 1000px (視邊距而定)，如果單張超過 500px 則建議分頁
-        const shouldPageBreak = cardHeight > 520;
-        
-        const officeCopy = createNoticeHTML('存檔副本 (Office Copy)');
-        const teacherCopy = createNoticeHTML('教師副本 (Teacher\'s Copy)');
-        
-        const divider = shouldPageBreak 
-            ? '<div class="page-break"></div>' 
-            : '<div class="copy-divider"></div>';
+    function renderNotices(allGroups) {
+        const target = document.getElementById('renderTarget');
+        target.innerHTML = '';
+
+        allGroups.forEach(group => {
+            const page = document.createElement('div');
+            page.className = 'a4-page';
             
-        const secondPageClass = shouldPageBreak ? 'second-page-padding' : '';
-
-        wrapper.innerHTML = `
-            <div>${officeCopy}</div>
-            ${divider}
-            <div class="${secondPageClass}">${teacherCopy}</div>
-        `;
-    }
-
-    function handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-            try {
-                if (file.name.match(/\.xlsx?$|\.xls$/)) {
-                    // 處理 Excel 檔案
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, {type: 'array'});
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" }); // defval 保證空單元格處理
-                    currentData = parseExtractedJSON(json);
-                } else if (file.name.endsWith('.json')) {
-                    // 處理 JSON 檔案
-                    const content = new TextDecoder().decode(e.target.result);
-                    const rawJson = JSON.parse(content);
-                    // 如果 JSON 也可能帶有不需要的引號，可以在這裡遞迴清理，或者簡單讓 parser 處理。
-                    // 這裡先假設 JSON 是標準格式。如果是匯出的 JSON 內文有引號，可以在 processAndDisplayData 處理。
-                    currentData = rawJson; 
-                } else {
-                    // 處理 CSV 檔案
-                    const content = new TextDecoder("utf-8").decode(e.target.result);
-                    currentData = parseCSV(content);
-                }
-                
-                processAndDisplayData();
-
-            } catch (err) {
-                console.error(err);
-                alert("檔案解析出錯，請檢查格式或欄位名稱是否正確。");
-            }
-        };
-
-        // Excel需要讀取為ArrayBuffer，文字檔案也可以透過解碼器讀取
-        reader.readAsArrayBuffer(file);
-        
-        // 重置 input 使同一檔案能重複選取
-        event.target.value = '';
-    }
-
-    // 處理提取後的資料 (Excel 或 CSV 通用)
-    function parseExtractedJSON(rows) {
-        if (!rows || rows.length === 0) throw new Error("Data is empty");
-        const first = rows[0];
-        
-        return {
-            date: stripQuotes(first["代課日期"] || first["教師代課日期"] || first["日期"] || ""),
-            originalTeacher: stripQuotes(first["教師代號"] || first["原任老師"] || ""),
-            absenceReason: stripQuotes(first["缺課原因"] || "職務需要 / 病假"),
-            // 如果 Excel 裡面已經有「處理編號」就讀取，否則留空交由後續邏輯生成
-            fileNumber: stripQuotes(first["處理編號"] || ""),
-            records: rows.map(row => ({
-                "原任老師": stripQuotes(row["原任老師"] || ""),
-                "節數": stripQuotes(row["節數"] || ""),
-                "時段": stripQuotes(row["時段"] || ""),
-                "班別": stripQuotes(row["班別"] || ""),
-                "科目": stripQuotes(row["科目"] || ""),
-                "代課老師": stripQuotes(row["代課老師"] || "")
-            }))
-        };
-    }
-
-    function parseCSV(csvText) {
-        const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
-        if (lines.length < 2) throw new Error("CSV content too short");
-
-        // 也對標題列做 stripQuotes，以防標題也被引號包住
-        const headers = lines[0].split(',').map(h => stripQuotes(h));
-        const rows = lines.slice(1).map(line => {
-            const values = line.split(',').map(v => stripQuotes(v));
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = values[i]);
-            return obj;
-        });
-
-        return parseExtractedJSON(rows);
-    }
-
-    // 將資料進行處理後更新畫面
-    function processAndDisplayData() {
-        // 再次確保處理時不會有遺漏的引號，雖然 parse 階段已經處理過了
-        currentData.date = stripQuotes(currentData.date);
-        currentData.fileNumber = stripQuotes(currentData.fileNumber);
-        currentData.originalTeacher = stripQuotes(currentData.originalTeacher);
-        currentData.absenceReason = stripQuotes(currentData.absenceReason);
-
-        // 1. 日期格式化與加入星期
-        currentData.date = formatWithDayOfWeek(currentData.date || "");
-        
-        // 2. 處理檔案編號：如果有提供「處理編號」優先使用，否則使用「SUB-代課日期年月日」
-        if (!currentData.fileNumber) {
-            currentData.fileNumber = generateFileNumber(currentData.date);
-        } else if (!currentData.fileNumber.startsWith('SUB-')) {
-            // 如果 Excel 中有處理編號但不包含 SUB-，自動按規則組裝
-            currentData.fileNumber = generateFileNumber(currentData.date);
-        }
-
-        // 3. 列印日期
-        if (!currentData.printDate) currentData.printDate = getTodayDateString();
-
-        // 4. 時段與節數的對應：如果資料表中的時段為空，透過內建對應表補全
-        currentData.records.forEach(row => {
-            row["節數"] = stripQuotes(row["節數"]);
-            row["時段"] = stripQuotes(row["時段"]);
+            const officeCopy = generateNoticeComponent(group, '存檔副本 (Office Copy)');
+            const teacherCopy = generateNoticeComponent(group, '教師副本 (Teacher\'s Copy)');
             
-            const period = row["節數"].trim();
-            if (!row["時段"] && periodTimes[period]) {
-                row["時段"] = periodTimes[period];
-            }
+            page.innerHTML = `
+                ${officeCopy}
+                <div class="cut-line"></div>
+                ${teacherCopy}
+            `;
+            
+            target.appendChild(page);
         });
-        
-        updateDisplay();
     }
-
-    // 初始化顯示
-    window.onload = () => {
-        processAndDisplayData();
-    };
 </script>
 
 </body>
