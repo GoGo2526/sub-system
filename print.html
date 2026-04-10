@@ -78,19 +78,27 @@
         /* 列印專屬設定 */
         @page {
             size: A4 portrait; /* 預設A4直印 */
-            margin: 0; /* 邊界設為0，藉此消除瀏覽器預設列印的網址、頁數及日期 */
+            margin: 0mm; /* 邊界設為0mm，藉此強制消除瀏覽器預設列印的網址、頁數及日期 */
         }
 
         @media print {
-            body { background: white; padding: 0; }
+            html, body { 
+                background: white; 
+                margin: 0; 
+                padding: 0; 
+                width: 210mm;
+                height: 297mm;
+            }
+            .preview-area { margin: 0; padding: 0; max-width: none; }
             .no-print { display: none !important; }
             .a4-page {
                 box-shadow: none;
                 margin: 0;
-                width: 210mm;
-                height: 297mm; /* 固定一頁大小，避免溢出 */
+                width: 100%; /* 自動調整文件寬度 */
+                height: 296.5mm; /* 固定一頁大小，稍微減去0.5mm避免溢出產生空白頁 */
                 padding: 15mm; /* 邊框保留合適距離 */
-                page-break-after: always;
+                page-break-after: always; /* 強制分頁，確保存檔與教師副本獨立印於新的一頁 */
+                page-break-inside: avoid;
                 box-sizing: border-box;
                 overflow: hidden;
             }
@@ -102,25 +110,25 @@
 <body>
 
 <div class="toolbar no-print p-4 shadow-sm mb-4">
-    <div class="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-3 w-full md:w-auto">
+    <div class="max-w-5xl mx-auto flex flex-wrap md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-1 min-w-[280px]">
             <div class="bg-blue-600 p-2 rounded-lg text-white shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
             <div>
-                <!-- 更改左上角名稱 -->
-                <h1 class="text-xl font-bold">觀塘官立小學(秀明道)-代課通知單系統</h1>
+                <!-- 更改左上角名稱，加上自動縮放及換行設定 -->
+                <h1 class="text-lg md:text-xl font-bold break-words leading-tight">觀塘官立小學(秀明道)-代課通知單系統</h1>
             </div>
         </div>
 
         <!-- 按鈕隨網頁改變大小並更新顏色 -->
-        <div class="flex w-full md:w-auto gap-3 flex-1 md:flex-none">
+        <div class="flex flex-wrap w-full md:w-auto gap-3">
             <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleFile(event)">
-            <button onclick="document.getElementById('fileInput').click()" class="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2.5 bg-green-700 text-white border border-transparent rounded-md hover:bg-green-800 transition font-medium text-base shadow-sm">
+            <button onclick="document.getElementById('fileInput').click()" class="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2.5 bg-green-700 text-white border border-transparent rounded-md hover:bg-green-800 transition font-medium text-base shadow-sm min-w-[140px]">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 匯入試算表
             </button>
-            <button onclick="window.print()" class="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2.5 bg-blue-800 text-white rounded-md hover:bg-blue-900 transition font-medium text-base shadow-sm">
+            <button onclick="window.print()" class="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2.5 bg-blue-800 text-white rounded-md hover:bg-blue-900 transition font-medium text-base shadow-sm min-w-[140px]">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 列印通知單
             </button>
