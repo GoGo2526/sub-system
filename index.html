@@ -804,8 +804,9 @@
                                             if (val) {
                                               const [y, m, d] = val.split('-');
                                               const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+                                              // 若使用者揀選星期六(6)或星期日(0)時，才出現提示訊息
                                               if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
-                                                setAlertMessage("對調課堂不能選擇「星期六」或「星期日」");
+                                                setAlertMessage("「對調課堂」不能選擇「星期六」或「星期日」");
                                                 handleUpdateSwap(key, 'date', '');
                                                 return;
                                               }
@@ -956,18 +957,18 @@
             </div>
           </div>
 
-          {/* 提示訊息彈跳視窗 */}
+          {/* 提示訊息彈跳視窗 (已進一步縮小方塊尺寸，但保留原有文字大小設定) */}
           {alertMessage && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[300px] p-6 text-center animate-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm transform rotate-3">
-                  <XCircle className="w-8 h-8" />
+              <div className="bg-white rounded-[1.25rem] shadow-2xl w-full max-w-[240px] p-4 text-center animate-in zoom-in-95 duration-200">
+                <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-lg flex items-center justify-center mx-auto mb-2 shadow-sm transform rotate-3">
+                  <XCircle className="w-5 h-5" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-800 mb-2">提示</h3>
-                <p className="text-lg text-slate-600 font-bold mb-6 leading-snug">{alertMessage}</p>
+                <h3 className="text-2xl font-black text-slate-800 mb-1.5">提示</h3>
+                <p className="text-lg text-slate-600 font-bold mb-4 leading-tight">{alertMessage}</p>
                 <button
                   onClick={() => setAlertMessage("")}
-                  className="w-full py-3 bg-blue-600 text-white font-black text-xl rounded-xl shadow-lg hover:bg-blue-700 transition-all active:scale-95"
+                  className="w-full py-2 bg-blue-600 text-white font-black text-xl rounded-xl shadow-md hover:bg-blue-700 transition-all active:scale-95"
                 >
                   確定
                 </button>
