@@ -64,9 +64,6 @@
     // ==========================================
     // 系統常數與初始資料
     // ==========================================
-    /**
-     * 智能編代課系統v1.15.1
-     */
     const INITIAL_RAW_DATA = {
       "mon": [
         ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
@@ -733,19 +730,16 @@
                         </h3>
                         
                         {(() => {
-                          const visibleSwaps = Object.entries(swapArrangements)
-                            .filter(([k]) => k.startsWith(`${activeTab}-`) && k.endsWith(`-${selectedTeacher}`))
-                            .sort((a, b) => parseInt(a[0].split('-')[1]) - parseInt(b[0].split('-')[1]));
+                          const allTeacherSwaps = Object.entries(swapArrangements)
+                            .filter(([k]) => k.endsWith(`-${selectedTeacher}`));
                           
                           const comboMap = new Map();
                           const duplicateKeys = new Set();
-                          let isDup = false;
 
-                          for (const [k, swap] of visibleSwaps) {
+                          for (const [k, swap] of allTeacherSwaps) {
                             if (swap.date && swap.period) {
                               const combo = `${swap.date}-${swap.period}`;
                               if (comboMap.has(combo)) {
-                                isDup = true;
                                 duplicateKeys.add(k);
                                 duplicateKeys.add(comboMap.get(combo));
                               } else {
@@ -754,9 +748,15 @@
                             }
                           }
 
+                          const visibleSwaps = allTeacherSwaps
+                            .filter(([k]) => k.startsWith(`${activeTab}-`))
+                            .sort((a, b) => parseInt(a[0].split('-')[1]) - parseInt(b[0].split('-')[1]));
+                          
+                          const hasVisibleConflict = visibleSwaps.some(([k]) => duplicateKeys.has(k));
+
                           return (
                             <>
-                              {isDup && (
+                              {hasVisibleConflict && (
                                 <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 rounded-2xl flex items-center gap-3 text-red-600 animate-in fade-in slide-in-from-top-2 shadow-sm">
                                   <XCircle className="w-6 h-6 shrink-0" />
                                   <span className="text-lg font-black tracking-wide">所選的調課的日子和課節出現重複,請重選.</span>
@@ -796,7 +796,7 @@
                                             const val = e.target.value;
                                             if (val) {
                                               const [y, m, d] = val.split('-');
-                                              const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+                                              const dateObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
                                               if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
                                                 e.target.setCustomValidity("不能揀選「星期六」或「星期日」。");
                                                 e.target.reportValidity();
