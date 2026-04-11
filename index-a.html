@@ -161,20 +161,6 @@
       { id: 'thur', label: '四', offset: 4 },
       { id: 'fri', label: '五', offset: 5 }
     ];
-    const DAYS_CONFIG = [
-      { id: 'mon', label: '一', offset: 1 },
-      { id: 'tue', label: '二', offset: 2 },
-      { id: 'wed', label: '三', offset: 3 },
-      { id: 'thur', label: '四', offset: 4 },
-      { id: 'fri', label: '五', offset: 5 }
-    ];
-    const DAYS_CONFIG = [
-      { id: 'mon', label: '一', offset: 1 },
-      { id: 'tue', label: '二', offset: 2 },
-      { id: 'wed', label: '三', offset: 3 },
-      { id: 'thur', label: '四', offset: 4 },
-      { id: 'fri', label: '五', offset: 5 }
-    ];
 
     const MAROON_TEACHERS = ["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"];
     const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
@@ -823,6 +809,9 @@
                                                 setAlertMessage("「對調課堂」不能選擇「星期六」或「星期日」");
                                                 handleUpdateSwap(key, 'date', '');
                                                 return;
+                                              } else {
+                                                // 若使用者選擇的日子是星期一至星期五，提示訊息絕對不會出現
+                                                setAlertMessage("");
                                               }
                                             }
                                             handleUpdateSwap(key, 'date', val);
@@ -854,17 +843,17 @@
                     <div className="flex flex-col md:flex-row justify-between items-center mt-12 pt-8 border-t-2 border-slate-200 gap-6">
                       <button
                         onClick={handleExportExcel}
-                        className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-2xl hover:bg-emerald-700 hover:shadow-lg transition-all"
+                        className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[clamp(1.1rem,4.5vw,1.5rem)] whitespace-nowrap hover:bg-emerald-700 hover:shadow-lg transition-all"
                       >
-                        <Download className="w-8 h-8" />
+                        <Download className="w-8 h-8 shrink-0" />
                         輸出Excel檔案
                       </button>
                       
                       <button
                         onClick={() => window.open('https://gogo2526.github.io/sub-system/print.html', '_blank')}
-                        className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 bg-[#800000] text-white rounded-2xl font-black text-2xl hover:bg-[#600000] hover:shadow-lg transition-all"
+                        className="flex items-center justify-center gap-3 w-full md:w-auto px-8 py-4 bg-[#800000] text-white rounded-2xl font-black text-[clamp(1.1rem,4.5vw,1.5rem)] whitespace-nowrap hover:bg-[#600000] hover:shadow-lg transition-all"
                       >
-                        <FileText className="w-8 h-8" />
+                        <FileText className="w-8 h-8 shrink-0" />
                         製作「代課通知單」
                       </button>
                     </div>
