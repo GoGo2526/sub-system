@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統 v.1.15.1</title>
+  <title>智能編代課系統v1.15.1</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -64,6 +64,18 @@
     // ==========================================
     // 系統常數與初始資料
     // ==========================================
+    /**
+     * 智能編代課系統v1.15.1
+     * * 修改重點：
+     * 1. 加入安全登入版面，並修正瀏覽器預設密碼圖示重疊問題
+     * 2. 確保 Excel 匯出十項核心資料格式及對調課堂顯示正確
+     * 3. 嚴格鎖定對調課堂日期選擇不能為星期六及日，並修正系統為週末時的解析干擾
+     * 4. 嚴格維持原本排版、視覺比例與所有文字設定
+     * 5. 教師代課狀態燈號加入「連兩節有課」顯示為黑色 X 的邏輯
+     * 6. 對調課堂安排加入重複選擇驗證，若日期與課節完全相同將顯示紅色警告告示
+     * 7. 於底端加入「檢視班別時間表」區塊，支援以班別及星期檢視各班的完整時間表
+     * 8. 將「檢視班別時間表」方塊轉為淺橙色系列，並將一般節數、小息/午息、午膳以3個不同色調區分顯示。
+     */
     const INITIAL_RAW_DATA = {
       "mon": [
         ["教師代號", "張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝", "麗", "周", "董", "龍", "榗", "秋", "桂", "靜", "麥", "欣", "卓", "儀", "詠", "艷", "芬", "鄺", "佳", "月", "瀅", "兆", "笑", "冼", "彥", "琳", "劉", "泉", "葉", "恩", "汪", "趙", "楚", "達", "豪", "蓮", "廖", "婉", "慧", "Rachel"],
@@ -500,7 +512,7 @@
               </div>
               <div>
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-                <h2 className="text-xl font-bold text-blue-600">智能編代課系統 v.1.15.1</h2>
+                <h2 className="text-xl font-bold text-blue-600">智能編代課系統v1.15.1</h2>
               </div>
             </div>
 
@@ -896,55 +908,52 @@
               </div>
 
               {selectedClassView && (
-                <div className="p-6 md:p-10 bg-white/40">
-                  <div className="hidden md:grid grid-cols-5 gap-4 border-b-2 border-slate-500 pb-4 mb-4 text-orange-900 font-black text-base md:text-lg lg:text-xl text-center">
-                    <div>班別</div>
-                    <div>課節</div>
-                    <div>時間</div>
-                    <div>科目</div>
-                    <div>教師代號</div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {getClassSchedule(selectedClassView, selectedDayView).map((slot, idx) => {
-                      const isBreak = slot.type === 'break';
-                      const isLunch = slot.id === 'LUNCH';
+                <div className="p-3 sm:p-6 md:p-10 bg-white/40 overflow-x-auto no-scrollbar">
+                  <div className="min-w-[320px]">
+                    <div className="grid grid-cols-5 gap-1 sm:gap-2 md:gap-4 border-b-2 border-slate-500 pb-2 md:pb-4 mb-3 md:mb-4 text-orange-900 font-black text-[11px] sm:text-sm md:text-lg lg:text-xl text-center">
+                      <div className="whitespace-nowrap">班別</div>
+                      <div className="whitespace-nowrap">課節</div>
+                      <div className="whitespace-nowrap">時間</div>
+                      <div className="whitespace-nowrap">科目</div>
+                      <div className="whitespace-nowrap">教師代號</div>
+                    </div>
+                    
+                    <div className="space-y-2 md:space-y-3">
+                      {getClassSchedule(selectedClassView, selectedDayView).map((slot, idx) => {
+                        const isBreak = slot.type === 'break';
+                        const isLunch = slot.id === 'LUNCH';
 
-                      let rowStyles = "bg-white hover:bg-orange-50 text-slate-800 border-2 border-slate-500";
-                      if (isLunch) {
-                        rowStyles = "bg-[#FFF9E3] hover:bg-[#FFF0B3] text-slate-900 border-2 border-slate-500";
-                      } else if (isBreak) {
-                        rowStyles = "bg-orange-100/80 hover:bg-orange-200/80 text-orange-800 border-2 border-slate-500";
-                      }
+                        let rowStyles = "bg-white hover:bg-orange-50 text-slate-800 border-2 border-slate-500";
+                        if (isLunch) {
+                          rowStyles = "bg-[#FFF9E3] hover:bg-[#FFF0B3] text-slate-900 border-2 border-slate-500";
+                        } else if (isBreak) {
+                          rowStyles = "bg-orange-100/80 hover:bg-orange-200/80 text-orange-800 border-2 border-slate-500";
+                        }
 
-                      return (
-                        <div 
-                          key={idx} 
-                          className={`grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 items-center text-center text-sm sm:text-base lg:text-lg font-bold p-3 md:p-4 rounded-2xl transition-all shadow-sm ${rowStyles}`}
-                        >
-                          <div className="md:block">
-                            <span className="md:hidden opacity-50 text-xs sm:text-sm block mb-1">班別</span>
-                            {isBreak ? '--' : selectedClassView}
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`grid grid-cols-5 gap-1 sm:gap-2 md:gap-4 items-center text-center text-[10px] sm:text-sm md:text-base lg:text-lg font-bold p-2 md:p-4 rounded-xl md:rounded-2xl transition-all shadow-sm ${rowStyles}`}
+                          >
+                            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {isBreak ? '--' : selectedClassView}
+                            </div>
+                            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {slot.label}
+                            </div>
+                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
+                              {slot.time}
+                            </div>
+                            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {slot.subject || (isBreak ? slot.label : '--')}
+                            </div>
+                            <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                              {slot.teacher || '--'}
+                            </div>
                           </div>
-                          <div>
-                            <span className="md:hidden opacity-50 text-xs sm:text-sm block mb-1">課節</span>
-                            {slot.label}
-                          </div>
-                          <div>
-                            <span className="md:hidden opacity-50 text-xs sm:text-sm block mb-1">時間</span>
-                            <span className="whitespace-nowrap">{slot.time}</span>
-                          </div>
-                          <div>
-                            <span className="md:hidden opacity-50 text-xs sm:text-sm block mb-1">科目</span>
-                            {slot.subject || (isBreak ? slot.label : '--')}
-                          </div>
-                          <div>
-                            <span className="md:hidden opacity-50 text-xs sm:text-sm block mb-1">教師代號</span>
-                            {slot.teacher || '--'}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               )}
