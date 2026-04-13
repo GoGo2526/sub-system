@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v2.0.1</title>
+  <title>智能編代課系統v2.0.2</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -294,10 +294,31 @@
           if (!isClassOccupied(schedule[lessonIdx])) {
             const totalLessons = schedule.filter(l => isClassOccupied(l)).length;
             
-            const hasPrev1Lesson = lessonIdx > 0 ? isClassOccupied(schedule[lessonIdx - 1]) : false;
-            const hasPrev2Lesson = lessonIdx > 1 ? isClassOccupied(schedule[lessonIdx - 2]) : false;
-            const hasNext1Lesson = lessonIdx < schedule.length - 1 ? isClassOccupied(schedule[lessonIdx + 1]) : false;
-            const hasNext2Lesson = lessonIdx < schedule.length - 2 ? isClassOccupied(schedule[lessonIdx + 2]) : false;
+            let prevCount = 0;
+            let hasPrev1Lesson = false;
+            let hasPrev2Lesson = false;
+            for (let i = lessonIdx - 1; i >= 0; i--) {
+              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
+              prevCount++;
+              if (prevCount === 1) hasPrev1Lesson = isClassOccupied(schedule[i]);
+              if (prevCount === 2) {
+                hasPrev2Lesson = isClassOccupied(schedule[i]);
+                break;
+              }
+            }
+
+            let nextCount = 0;
+            let hasNext1Lesson = false;
+            let hasNext2Lesson = false;
+            for (let i = lessonIdx + 1; i < schedule.length; i++) {
+              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
+              nextCount++;
+              if (nextCount === 1) hasNext1Lesson = isClassOccupied(schedule[i]);
+              if (nextCount === 2) {
+                hasNext2Lesson = isClassOccupied(schedule[i]);
+                break;
+              }
+            }
 
             const prevStatus = (hasPrev1Lesson && hasPrev2Lesson) ? 'X' : (hasPrev1Lesson ? 'R' : 'G');
             const nextStatus = (hasNext1Lesson && hasNext2Lesson) ? 'X' : (hasNext1Lesson ? 'R' : 'G');
@@ -503,9 +524,9 @@
               <div>
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.0.1</h2>
+                  <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.0.2</h2>
                   <div className="flex gap-2">
-                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
+                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
                     <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
                   </div>
                 </div>
