@@ -476,11 +476,11 @@
       // 處理檢視調放建議的比對邏輯
       const handleViewSwapSuggestions = () => {
         if (!swapOriginalTeacher || !swapSubTeacher) {
-          setAlertMessage("請先選擇「原任」及「代課」教師！");
+          setAlertMessage("請先選擇「代課」及「缺課」教師！");
           return;
         }
         if (swapOriginalTeacher === swapSubTeacher) {
-          setAlertMessage("「原任」與「代課」不能為同一人！");
+          setAlertMessage("「代課」與「缺課」不能為同一人！");
           return;
         }
 
@@ -491,15 +491,15 @@
           const matchedSlots = [];
 
           SCHEDULE_STRUCTURE.forEach((slot, idx) => {
-            // 略過小息、午休與午膳時間
-            if (slot.type === 'break' || slot.id === 'LUNCH' || slot.id === 'HR') return;
+            // 略過小息、午休時間，但包括班主任節及午膳時間作比對
+            if (slot.type === 'break') return;
             
             const origOccupied = isClassOccupied(origSched[idx]);
             const subOccupied = isClassOccupied(subSched[idx]);
 
-            // 邏輯：剔除兩者都有課堂，或兩者都是吉堂的課節
-            // 換句話說：兩者的上課狀態不同 (XOR) 時才保留
-            if (origOccupied !== subOccupied) {
+            // 邏輯：比對”代課”的吉堂(!origOccupied) 和”缺課”的要上課(subOccupied)
+            // 剔除兩者都有課堂，或兩者都是吉堂的課節
+            if (!origOccupied && subOccupied) {
               matchedSlots.push(slot.label);
             }
           });
@@ -980,7 +980,7 @@
 
                   <div className="flex flex-col md:flex-row gap-3 md:gap-6 mb-6">
                     <div className="flex-1 relative group w-full min-w-0">
-                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">原任老師：</label>
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">代課老師：</label>
                       <div className="relative">
                         <select
                           value={swapOriginalTeacher}
@@ -997,7 +997,7 @@
                     </div>
 
                     <div className="flex-1 relative group w-full min-w-0">
-                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">代課老師：</label>
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">缺課老師：</label>
                       <div className="relative">
                         <select
                           value={swapSubTeacher}
