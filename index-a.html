@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v2.0.2</title>
+  <title>智能編代課系統v2.2.1</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,6 +14,9 @@
   
   <!-- 引入 Babel 讓瀏覽器可以即時編譯 JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- 引入 SheetJS (XLSX) 用於解析 Excel 檔案 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     /* 隱藏捲軸但保留滾動功能 */
@@ -29,13 +32,28 @@
     input[type="password"]::-webkit-reveal {
       display: none !important;
     }
+
+    /* 統計表格專用虛線樣式 */
+    .stat-table th, .stat-table td {
+      border-bottom: 1px dotted #888;
+      border-right: 1px dotted #888;
+    }
+    .stat-table th:last-child, .stat-table td:last-child {
+      border-right: none;
+    }
+    .stat-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body class="bg-[#F0F2F5]">
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useRef } = React;
 
     // ==========================================
     // 獨立封裝 Lucide 圖標組 (為了解決 CDN 模組匯入錯誤)
@@ -137,7 +155,7 @@
       ],
     };
 
-     const SCHEDULE_STRUCTURE = [
+      const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
@@ -187,6 +205,156 @@
       const [selectedClassView, setSelectedClassView] = useState("");
       const [selectedDayView, setSelectedDayView] = useState("mon");
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
+      const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
+      
+      // 新增數據統計的狀態與初始值載入 (加入 LocalStorage 支援以保留數據)
+      const [showDataStatsSection, setShowDataStatsSection] = useState(false);
+      const [statsUpdateDate, setStatsUpdateDate] = useState(() => {
+        return localStorage.getItem('subSystemStatsDate') || "";
+      });
+
+      // 改為使用物件儲存原始狀態，以便後續累積更新 (從 LocalStorage 讀取或預設為0)
+      const [statsRawData, setStatsRawData] = useState(() => {
+        const savedStats = localStorage.getItem('subSystemStats');
+        if (savedStats) {
+          try {
+            return JSON.parse(savedStats);
+          } catch (e) {
+            console.error("無法解析儲存的統計數據", e);
+          }
+        }
+        
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        const initMap = {};
+        allTeachers.forEach(t => {
+          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
+        });
+        return initMap;
+      });
+
+      // 監聽狀態變更並自動儲存至瀏覽器 LocalStorage
+      useEffect(() => {
+        localStorage.setItem('subSystemStats', JSON.stringify(statsRawData));
+      }, [statsRawData]);
+
+      useEffect(() => {
+        localStorage.setItem('subSystemStatsDate', statsUpdateDate);
+      }, [statsUpdateDate]);
+
+      // 由 statsRawData 衍生出供表格顯示的陣列資料
+      const statsData = useMemo(() => {
+        return Object.keys(statsRawData).map(teacher => {
+          const absentPeriods = statsRawData[teacher].absentPeriods;
+          const subPeriods = statsRawData[teacher].subPeriods;
+          return {
+            teacher,
+            absentDays: statsRawData[teacher].absentDates.length,
+            absentPeriods: absentPeriods,
+            subPeriods: subPeriods,
+            netValue: subPeriods - absentPeriods // 淨值計算: 代課課節減去缺課課節
+          };
+        });
+      }, [statsRawData]);
+
+      // 新增調課吉堂建議的狀態
+      const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
+      const [swapOriginalTeacher, setSwapOriginalTeacher] = useState("");
+      const [swapSubTeacher, setSwapSubTeacher] = useState("");
+      const [swapSuggestions, setSwapSuggestions] = useState(null);
+
+      const fileInputRef = useRef(null);
+
+      // 匯入檔案按鈕的處理函數 (已解除密碼)
+      const handleImportClick = (e) => {
+        e.preventDefault();
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      };
+
+      // 清空統計資料的處理函數 (已解除密碼)
+      const handleClearStats = () => {
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        const initMap = {};
+        allTeachers.forEach(t => {
+          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
+        });
+        setStatsRawData(initMap);
+        setStatsUpdateDate("");
+        localStorage.removeItem('subSystemStats');
+        localStorage.removeItem('subSystemStatsDate');
+        setAlertMessage("所有統計數據已經清空為0。");
+      };
+
+      // 處理 Excel 檔案匯入與計算 (支援累積與剔除對調課堂)
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            setStatsRawData(prevStats => {
+              // 深拷貝現有的狀態以進行累積
+              const nextStats = JSON.parse(JSON.stringify(prevStats));
+
+              jsonData.forEach(row => {
+                // 剔除有對調課堂的列
+                const swapData = row["對調課堂"];
+                if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") {
+                  return; // 跳過此列
+                }
+
+                const date = row["代課日期"];
+                const originalTeacher = row["原任老師"];
+                const substituteTeacher = row["代課老師"];
+                
+                // 檢查節數是否為數字
+                let periods = 1;
+                if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
+                  const parsed = Number(row["節數"]);
+                  periods = isNaN(parsed) ? 1 : parsed;
+                }
+
+                // 累積原任老師 (缺課) 數據
+                if (originalTeacher && nextStats[originalTeacher]) {
+                  if (date && !nextStats[originalTeacher].absentDates.includes(date)) {
+                    nextStats[originalTeacher].absentDates.push(date);
+                  }
+                  nextStats[originalTeacher].absentPeriods += periods;
+                }
+
+                // 累積代課老師 (代課) 數據
+                if (substituteTeacher && nextStats[substituteTeacher]) {
+                  nextStats[substituteTeacher].subPeriods += periods;
+                }
+              });
+
+              return nextStats;
+            });
+
+            // 設定更新日期為 日-月-年 (DD-MM-YYYY)
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            setStatsUpdateDate(`${dd}-${mm}-${yyyy}`);
+            
+            // 讀取後清空 input 的值，讓使用者可以再次選擇同一個檔案
+            e.target.value = null;
+
+          } catch (error) {
+            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「對調課堂」等欄位。");
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      };
 
       // 已移除定時器 setInterval，解決原生小月曆在週末被強制鎖定或關閉的問題
       useEffect(() => {
@@ -457,13 +625,48 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
-        if (passwordInput === 'Smr-5354') {
+        if (passwordInput === 'Smr-2026') {
           setIsAuthenticated(true);
           setLoginError("");
         } else {
           setLoginError("密碼錯誤，請重新輸入。");
           setPasswordInput("");
         }
+      };
+
+      // 處理檢視調放建議的比對邏輯
+      const handleViewSwapSuggestions = () => {
+        if (!swapOriginalTeacher || !swapSubTeacher) {
+          setAlertMessage("請先選擇「代課」及「缺課」教師！");
+          return;
+        }
+        if (swapOriginalTeacher === swapSubTeacher) {
+          setAlertMessage("「代課」與「缺課」不能為同一人！");
+          return;
+        }
+
+        const results = {};
+        DAYS_CONFIG.forEach(day => {
+          const origSched = getTeacherSchedule(swapOriginalTeacher, day.id);
+          const subSched = getTeacherSchedule(swapSubTeacher, day.id);
+          const matchedSlots = [];
+
+          SCHEDULE_STRUCTURE.forEach((slot, idx) => {
+            // 略過小息、午休時間，但包括班主任節及午膳時間作比對
+            if (slot.type === 'break') return;
+            
+            const origOccupied = isClassOccupied(origSched[idx]);
+            const subOccupied = isClassOccupied(subSched[idx]);
+
+            // 邏輯：比對”代課”的吉堂(!origOccupied) 和”缺課”的要上課(subOccupied)
+            // 剔除兩者都有課堂，或兩者都是吉堂的課節
+            if (!origOccupied && subOccupied) {
+              matchedSlots.push(slot.label);
+            }
+          });
+          results[day.id] = matchedSlots.length > 0 ? matchedSlots.join(", ") : "--";
+        });
+        setSwapSuggestions(results);
       };
 
       if (!isAuthenticated) {
@@ -521,14 +724,22 @@
               <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
                 <Calendar className="text-white w-8 h-8" />
               </div>
-              <div>
+              <div className="flex-1 w-full overflow-hidden">
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.0.2</h2>
-                  <div className="flex gap-2">
-                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
-                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
+                <div className="flex flex-row items-center justify-between gap-2 w-full">
+                  <div className="flex flex-row items-center gap-1.5 sm:gap-3 overflow-hidden shrink">
+                    <h2 className="text-[3.8vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v2.2.1</h2>
+                    <div className="flex gap-1 sm:gap-2 shrink-0">
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-gray-500 hover:bg-gray-600 text-white text-[2.8vw] sm:text-sm font-bold py-1 px-2 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-[#800000] hover:bg-[#600000] text-white text-[2.8vw] sm:text-sm font-bold py-1 px-2 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">半日</button>
+                    </div>
                   </div>
+                  <button 
+                    onClick={() => { setIsAuthenticated(false); setPasswordInput(""); }} 
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white text-lg sm:text-2xl font-black py-1 sm:py-1.5 px-3 sm:px-6 rounded-xl shadow-sm transition-all whitespace-nowrap shrink-0"
+                  >
+                    登出
+                  </button>
                 </div>
               </div>
             </div>
@@ -886,50 +1097,238 @@
               </div>
             )}
 
-            <div className="mt-8 bg-orange-50 rounded-[3rem] shadow-2xl border border-orange-200 overflow-hidden text-slate-800 w-full">
-              <div className="p-5 md:p-10 border-b border-orange-200 bg-gradient-to-br from-orange-100 to-orange-50">
-                <div className="flex flex-row items-center mb-6 md:mb-8">
-                  <h3 className="text-2xl md:text-3xl font-black flex items-center gap-2 md:gap-3 text-orange-900 mb-0">
-                    <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-orange-600" />
-                    檢視班別時間表
-                    <div className="flex items-center gap-2 ml-2 md:ml-4">
-                      <button onClick={() => setIsClassScheduleVisible(true)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">+</button>
-                      <button onClick={() => setIsClassScheduleVisible(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
-                    </div>
-                  </h3>
+            {/* 獨立方塊：包含 3 個藍色系列按鈕 (移至條件判斷外，無需選擇教師即可顯示) */}
+            <div className="mt-8 bg-white rounded-[2rem] shadow-xl border-2 border-slate-100 p-6 sm:p-8">
+              <div className="flex flex-row w-full gap-1.5 sm:gap-3 justify-between">
+                <button 
+                  onClick={() => {
+                    setShowDataStatsSection(prev => !prev);
+                    setTimeout(() => {
+                      const el = document.getElementById('data-stats-section');
+                      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }}
+                  className="flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-200 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                >
+                  <span className="sm:hidden">數據統計</span>
+                  <span className="hidden sm:inline">數據統計</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowSwapSuggestionSection(prev => !prev);
+                    setTimeout(() => {
+                      const el = document.getElementById('swap-suggestion-section');
+                      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }}
+                  className="flex-1 bg-blue-500 text-white hover:bg-blue-600 border-2 border-blue-500 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                >
+                  <span className="sm:hidden">調課建議</span>
+                  <span className="hidden sm:inline">調課吉堂建議</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowClassScheduleSection(prev => !prev);
+                    setTimeout(() => {
+                      const el = document.getElementById('class-schedule-section');
+                      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }}
+                  className="flex-1 bg-blue-800 text-white hover:bg-blue-900 border-2 border-blue-800 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                >
+                  <span className="sm:hidden">班時間表</span>
+                  <span className="hidden sm:inline">班別時間表</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 新增方塊：數據統計資料 */}
+            {showDataStatsSection && (
+              <div id="data-stats-section" className="mt-8 bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-4 border-b-2 border-slate-100 pb-4">
+                  <div className="flex flex-row items-baseline justify-between w-full lg:w-auto gap-2">
+                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課統計資料</h2>
+                    <span className="text-[3vw] sm:text-sm md:text-base text-slate-500 font-bold whitespace-nowrap">
+                      (更新日期：{statsUpdateDate || '日-月-年'})
+                    </span>
+                  </div>
+                  <div className="flex items-center shrink-0 gap-2 w-full lg:w-auto justify-end">
+                    <button 
+                      onClick={handleImportClick}
+                      className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
+                    >
+                      匯入檔案
+                    </button>
+                    <input 
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleFileUpload} 
+                      className="hidden"
+                      ref={fileInputRef}
+                    />
+                    <button 
+                      onClick={handleClearStats}
+                      className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
+                    >
+                      清空
+                    </button>
+                  </div>
                 </div>
+                
+                <div className="mb-4 text-[3.5vw] sm:text-sm md:text-base text-slate-500 font-bold">
+                  備註：以下資料僅供參考，實際數據以校方公佈為準。
+                </div>
+
+                <div className="border-2 border-slate-400 rounded-lg overflow-hidden bg-white p-1 shadow-sm">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[50vh] no-scrollbar">
+                    <table className="w-full text-center stat-table text-xs min-[375px]:text-sm sm:text-base md:text-xl font-bold table-auto">
+                      <thead className="relative z-10">
+                        <tr>
+                          <th className="sticky top-0 bg-[#D9D9D9] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">教師代號</th>
+                          <th className="sticky top-0 bg-[#FFF2CC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">缺課日數</th>
+                          <th className="sticky top-0 bg-[#DDEBF7] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">缺課課節</th>
+                          <th className="sticky top-0 bg-[#E2EFDA] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">代課課節</th>
+                          <th className="sticky top-0 bg-[#FCE4D6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">淨值</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statsData.map((row, idx) => (
+                          <tr key={idx}>
+                            <td className="bg-[#F2F2F2] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{row.teacher}</td>
+                            <td className="bg-[#FFF9E6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentDays)}</td>
+                            <td className="bg-[#EEF5FC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentPeriods)}</td>
+                            <td className="bg-[#F0F7EC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.subPeriods)}</td>
+                            <td className="bg-[#FDF1EB] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.netValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 新增方塊：調課吉堂建議 */}
+            {showSwapSuggestionSection && (
+              <div id="swap-suggestion-section" className="mt-8 bg-blue-50 rounded-[3rem] shadow-2xl border border-blue-200 overflow-hidden text-slate-800 w-full animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="p-5 md:p-10 border-b border-blue-200 bg-gradient-to-br from-blue-100 to-blue-50">
+                  <div className="flex flex-row items-center mb-6 md:mb-8">
+                    <Calendar className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
+                    <h3 className="text-xl md:text-3xl font-black text-blue-900 ml-3 md:ml-4 flex items-center">
+                      調課吉堂建議
+                      <div className="flex items-center gap-2 ml-2 md:ml-4">
+                        <button onClick={() => setShowSwapSuggestionSection(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
+                      </div>
+                    </h3>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-3 md:gap-6 mb-6">
+                    <div className="flex-1 relative group w-full min-w-0">
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">代課老師：</label>
+                      <div className="relative">
+                        <select
+                          value={swapOriginalTeacher}
+                          onChange={(e) => setSwapOriginalTeacher(e.target.value)}
+                          className="w-full appearance-none bg-white border-2 border-blue-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-blue-500 outline-none transition-all cursor-pointer shadow-sm truncate"
+                        >
+                          <option value="" disabled>請選擇...</option>
+                          {teachers.map(t => (
+                            <option key={t} value={t} className="text-slate-900">{t}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-blue-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 relative group w-full min-w-0">
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">缺課老師：</label>
+                      <div className="relative">
+                        <select
+                          value={swapSubTeacher}
+                          onChange={(e) => setSwapSubTeacher(e.target.value)}
+                          className="w-full appearance-none bg-white border-2 border-blue-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-blue-500 outline-none transition-all cursor-pointer shadow-sm truncate"
+                        >
+                          <option value="" disabled>請選擇...</option>
+                          {teachers.map(t => (
+                            <option key={t} value={t} className="text-slate-900">{t}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-blue-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col justify-end min-w-[120px]">
+                      <button
+                        onClick={handleViewSwapSuggestions}
+                        className="w-full appearance-none bg-blue-600 border-2 border-blue-600 px-4 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-black text-white hover:bg-blue-700 outline-none transition-all cursor-pointer shadow-sm"
+                      >
+                        檢視
+                      </button>
+                    </div>
+                  </div>
+
+                  {swapSuggestions && (
+                    <div className="p-4 sm:p-6 md:p-8 bg-white/60 rounded-2xl md:rounded-3xl border-2 border-blue-200 shadow-sm w-full">
+                      <h4 className="text-lg md:text-2xl font-black text-blue-900 mb-4 border-b-2 border-blue-300 pb-2">建議清單 ({swapOriginalTeacher}) → ({swapSubTeacher})</h4>
+                      <div className="flex flex-col gap-2 md:gap-4 text-sm md:text-lg lg:text-xl font-bold text-slate-800">
+                        {DAYS_CONFIG.map(day => (
+                          <div key={day.id} className="flex gap-4 md:gap-8 items-start">
+                            <div className="text-blue-800 font-black min-w-[60px] md:min-w-[80px]">星期{day.label}</div>
+                            <div className="text-slate-700 break-words">{swapSuggestions[day.id]}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showClassScheduleSection && (
+              <div id="class-schedule-section" className="mt-8 bg-emerald-50 rounded-[3rem] shadow-2xl border border-emerald-200 overflow-hidden text-slate-800 w-full animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="p-5 md:p-10 border-b border-emerald-200 bg-gradient-to-br from-emerald-100 to-emerald-50">
+                  <div className="flex flex-row items-center mb-6 md:mb-8">
+                    <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-emerald-600" />
+                    <h3 className="text-xl md:text-3xl font-black text-emerald-900 ml-3 md:ml-4 flex items-center">
+                      檢視班別時間表
+                      <div className="flex items-center gap-2 ml-2 md:ml-4">
+                        <button onClick={() => setIsClassScheduleVisible(true)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-emerald-300 text-emerald-600 rounded-lg hover:bg-emerald-50 font-black text-xl leading-none transition-colors shadow-sm">+</button>
+                        <button onClick={() => setIsClassScheduleVisible(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-emerald-300 text-emerald-600 rounded-lg hover:bg-emerald-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
+                      </div>
+                    </h3>
+                  </div>
                 
                 <div className="flex flex-row gap-3 md:gap-6 mb-2">
                   <div className="flex-1 relative group w-full min-w-0">
-                    <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-orange-900 truncate">班別</label>
+                    <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-emerald-900 truncate">班別</label>
                     <div className="relative">
                       <select
                         value={selectedClassView}
                         onChange={(e) => setSelectedClassView(e.target.value)}
-                        className="w-full appearance-none bg-white border-2 border-orange-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-orange-500 outline-none transition-all cursor-pointer shadow-sm truncate"
+                        className="w-full appearance-none bg-white border-2 border-emerald-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-emerald-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                       >
                         <option value="" disabled>請選擇班別...</option>
                         {availableClasses.map(cls => (
                           <option key={cls} value={cls} className="text-slate-900">{cls}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-orange-400 pointer-events-none" />
+                      <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-emerald-400 pointer-events-none" />
                     </div>
                   </div>
 
                   <div className="flex-1 relative group w-full min-w-0">
-                    <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-orange-900 truncate">星期</label>
+                    <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-emerald-900 truncate">星期</label>
                     <div className="relative">
                       <select
                         value={selectedDayView}
                         onChange={(e) => setSelectedDayView(e.target.value)}
-                        className="w-full appearance-none bg-white border-2 border-orange-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-orange-500 outline-none transition-all cursor-pointer shadow-sm truncate"
+                        className="w-full appearance-none bg-white border-2 border-emerald-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-emerald-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                       >
                         {DAYS_CONFIG.map(day => (
                           <option key={day.id} value={day.id} className="text-slate-900">星期{day.label}</option>
                         ))}
                       </select>
-                      <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-orange-400 pointer-events-none" />
+                      <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-emerald-400 pointer-events-none" />
                     </div>
                   </div>
                 </div>
@@ -938,7 +1337,7 @@
               {isClassScheduleVisible && selectedClassView && (
                 <div className="p-1.5 sm:p-6 md:p-10 bg-white/40 overflow-hidden w-full">
                   <div className="w-full mx-auto">
-                    <div className="grid grid-cols-[0.6fr_1.1fr_3.4fr_0.9fr_1fr] md:grid-cols-5 gap-1 sm:gap-2 md:gap-4 border-b-2 border-slate-500 pb-2 md:pb-4 mb-2 md:mb-4 text-orange-900 font-black text-[10px] min-[375px]:text-[11px] sm:text-sm md:text-lg lg:text-xl text-center px-0.5">
+                    <div className="grid grid-cols-[0.6fr_1.1fr_3.4fr_0.9fr_1fr] md:grid-cols-5 gap-1 sm:gap-2 md:gap-4 border-b-2 border-slate-500 pb-2 md:pb-4 mb-2 md:mb-4 text-emerald-900 font-black text-[10px] min-[375px]:text-[11px] sm:text-sm md:text-lg lg:text-xl text-center px-0.5">
                       <div className="whitespace-nowrap tracking-tighter sm:tracking-normal">班別</div>
                       <div className="whitespace-nowrap tracking-tighter sm:tracking-normal">課節</div>
                       <div className="whitespace-nowrap tracking-tighter sm:tracking-normal">時間</div>
@@ -951,11 +1350,11 @@
                         const isBreak = slot.type === 'break';
                         const isLunch = slot.id === 'LUNCH';
 
-                        let rowStyles = "bg-white hover:bg-orange-50 text-slate-800 border-2 border-slate-500";
+                        let rowStyles = "bg-white hover:bg-emerald-50 text-slate-800 border-2 border-slate-500";
                         if (isLunch) {
-                          rowStyles = "bg-[#FFF9E3] hover:bg-[#FFF0B3] text-slate-900 border-2 border-slate-500";
+                          rowStyles = "bg-emerald-700 hover:bg-emerald-800 text-white border-2 border-slate-500";
                         } else if (isBreak) {
-                          rowStyles = "bg-orange-100/80 hover:bg-orange-200/80 text-orange-800 border-2 border-slate-500";
+                          rowStyles = "bg-emerald-100/80 hover:bg-emerald-200/80 text-emerald-800 border-2 border-slate-500";
                         }
 
                         return (
@@ -986,6 +1385,7 @@
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* 提示訊息彈跳視窗 (已進一步縮小方塊尺寸，但保留原有文字大小設定) */}
