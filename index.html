@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v2.0.2</title>
+  <title>智能編代課系統v2.1.1</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -187,6 +187,7 @@
       const [selectedClassView, setSelectedClassView] = useState("");
       const [selectedDayView, setSelectedDayView] = useState("mon");
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
+      const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
 
       // 已移除定時器 setInterval，解決原生小月曆在週末被強制鎖定或關閉的問題
       useEffect(() => {
@@ -457,7 +458,7 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
-        if (passwordInput === 'Smr-5354') {
+        if (passwordInput === 'Smr-2026') {
           setIsAuthenticated(true);
           setLoginError("");
         } else {
@@ -522,11 +523,11 @@
                 <Calendar className="text-white w-8 h-8" />
               </div>
               <div>
-                <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.0.2</h2>
-                  <div className="flex gap-2">
-                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.1.1</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
                     <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
                   </div>
                 </div>
@@ -886,18 +887,43 @@
               </div>
             )}
 
-            <div className="mt-8 bg-orange-50 rounded-[3rem] shadow-2xl border border-orange-200 overflow-hidden text-slate-800 w-full">
-              <div className="p-5 md:p-10 border-b border-orange-200 bg-gradient-to-br from-orange-100 to-orange-50">
-                <div className="flex flex-row items-center mb-6 md:mb-8">
-                  <h3 className="text-2xl md:text-3xl font-black flex items-center gap-2 md:gap-3 text-orange-900 mb-0">
+            {/* 獨立方塊：包含 3 個藍色系列按鈕 (移至條件判斷外，無需選擇教師即可顯示) */}
+            <div className="mt-8 bg-white rounded-[2rem] shadow-xl border-2 border-slate-100 p-6 sm:p-8">
+              <div className="flex flex-row w-full gap-1.5 sm:gap-3 justify-between">
+                <button className="flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-200 rounded-lg sm:rounded-xl py-2 px-1 text-[11px] min-[375px]:text-xs sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                  檢視代課次數
+                </button>
+                <button className="flex-1 bg-blue-500 text-white hover:bg-blue-600 border-2 border-blue-500 rounded-lg sm:rounded-xl py-2 px-1 text-[11px] min-[375px]:text-xs sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                  調課空堂建議
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowClassScheduleSection(prev => !prev);
+                    setTimeout(() => {
+                      const el = document.getElementById('class-schedule-section');
+                      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }}
+                  className="flex-1 bg-blue-800 text-white hover:bg-blue-900 border-2 border-blue-800 rounded-lg sm:rounded-xl py-2 px-1 text-[11px] min-[375px]:text-xs sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                >
+                  班別時間表
+                </button>
+              </div>
+            </div>
+
+            {showClassScheduleSection && (
+              <div id="class-schedule-section" className="mt-8 bg-orange-50 rounded-[3rem] shadow-2xl border border-orange-200 overflow-hidden text-slate-800 w-full animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="p-5 md:p-10 border-b border-orange-200 bg-gradient-to-br from-orange-100 to-orange-50">
+                  <div className="flex flex-row items-center mb-6 md:mb-8">
                     <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-orange-600" />
-                    檢視班別時間表
-                    <div className="flex items-center gap-2 ml-2 md:ml-4">
-                      <button onClick={() => setIsClassScheduleVisible(true)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">+</button>
-                      <button onClick={() => setIsClassScheduleVisible(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
-                    </div>
-                  </h3>
-                </div>
+                    <h3 className="text-xl md:text-3xl font-black text-orange-900 ml-3 md:ml-4 flex items-center">
+                      檢視班別時間表
+                      <div className="flex items-center gap-2 ml-2 md:ml-4">
+                        <button onClick={() => setIsClassScheduleVisible(true)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">+</button>
+                        <button onClick={() => setIsClassScheduleVisible(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-orange-300 text-orange-600 rounded-lg hover:bg-orange-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
+                      </div>
+                    </h3>
+                  </div>
                 
                 <div className="flex flex-row gap-3 md:gap-6 mb-2">
                   <div className="flex-1 relative group w-full min-w-0">
@@ -986,6 +1012,7 @@
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* 提示訊息彈跳視窗 (已進一步縮小方塊尺寸，但保留原有文字大小設定) */}
