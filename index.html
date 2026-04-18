@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v2.1.1</title>
+  <title>智能編代課系統v2.2.1</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,6 +14,9 @@
   
   <!-- 引入 Babel 讓瀏覽器可以即時編譯 JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- 引入 SheetJS (XLSX) 用於解析 Excel 檔案 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
   <style>
     /* 隱藏捲軸但保留滾動功能 */
@@ -29,6 +32,21 @@
     input[type="password"]::-webkit-reveal {
       display: none !important;
     }
+
+    /* 統計表格專用虛線樣式 */
+    .stat-table th, .stat-table td {
+      border-bottom: 1px dotted #888;
+      border-right: 1px dotted #888;
+    }
+    .stat-table th:last-child, .stat-table td:last-child {
+      border-right: none;
+    }
+    .stat-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   </style>
 </head>
 <body class="bg-[#F0F2F5]">
@@ -189,11 +207,100 @@
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
+      // 新增數據統計的狀態與初始值載入
+      const [showDataStatsSection, setShowDataStatsSection] = useState(false);
+      const [statsUpdateDate, setStatsUpdateDate] = useState("");
+      const [statsData, setStatsData] = useState(() => {
+        // 預設載入所有教師代號並設為0
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        return allTeachers.map(t => ({
+          teacher: t,
+          absentDays: 0,
+          absentPeriods: 0,
+          subPeriods: 0,
+          netValue: 0
+        }));
+      });
+
       // 新增調課吉堂建議的狀態
       const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
       const [swapOriginalTeacher, setSwapOriginalTeacher] = useState("");
       const [swapSubTeacher, setSwapSubTeacher] = useState("");
       const [swapSuggestions, setSwapSuggestions] = useState(null);
+
+      // 處理 Excel 檔案匯入與計算
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            const stats = {};
+            
+            // 載入預設教師名單，確保未出現在 Excel 的教師也保留初始值0
+            statsData.forEach(item => {
+              stats[item.teacher] = { absentDates: new Set(), absentPeriods: 0, subPeriods: 0 };
+            });
+
+            jsonData.forEach(row => {
+              const date = row["代課日期"];
+              const originalTeacher = row["原任老師"];
+              const substituteTeacher = row["代課老師"];
+              
+              // 修正：檢查節數是否為空白或非數字，避免產生 NaN 導致 React 錯誤
+              let periods = 1;
+              if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
+                const parsed = Number(row["節數"]);
+                periods = isNaN(parsed) ? 1 : parsed;
+              }
+
+              // 計算原任老師 (缺課)
+              if (originalTeacher && stats[originalTeacher]) {
+                if (date) stats[originalTeacher].absentDates.add(date); // Set 會自動過濾同日期的多筆紀錄
+                stats[originalTeacher].absentPeriods += periods;
+              }
+
+              // 計算代課老師 (代課)
+              if (substituteTeacher && stats[substituteTeacher]) {
+                stats[substituteTeacher].subPeriods += periods;
+              }
+            });
+
+            const finalData = Object.keys(stats).map(teacher => {
+              // 修正：加入回退值 (|| 0) 確保輸出絕對是數字
+              const absentPeriods = Number(stats[teacher].absentPeriods) || 0;
+              const subPeriods = Number(stats[teacher].subPeriods) || 0;
+              return {
+                teacher,
+                absentDays: stats[teacher].absentDates.size || 0,
+                absentPeriods: absentPeriods,
+                subPeriods: subPeriods,
+                netValue: subPeriods - absentPeriods // 淨值計算: 代課課節減去缺課課節
+              };
+            });
+
+            setStatsData(finalData);
+
+            // 設定更新日期為 日-月-年 (DD-MM-YYYY)
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            setStatsUpdateDate(`${dd}-${mm}-${yyyy}`);
+            
+          } catch (error) {
+            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」欄位。");
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      };
 
       // 已移除定時器 setInterval，解決原生小月曆在週末被強制鎖定或關閉的問題
       useEffect(() => {
@@ -563,15 +670,23 @@
               <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
                 <Calendar className="text-white w-8 h-8" />
               </div>
-              <div>
-              <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-              <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.1.1</h2>
-                <div className="flex gap-2">
-                  <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
-                    <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
+              <div className="flex-1 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.2.1</h2>
+                    <div className="flex gap-2">
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
+                    </div>
                   </div>
                 </div>
+                <button 
+                  onClick={() => { setIsAuthenticated(false); setPasswordInput(""); }} 
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-2 px-5 rounded-xl shadow-sm transition-all whitespace-nowrap shrink-0"
+                >
+                  登出
+                </button>
               </div>
             </div>
 
@@ -931,7 +1046,16 @@
             {/* 獨立方塊：包含 3 個藍色系列按鈕 (移至條件判斷外，無需選擇教師即可顯示) */}
             <div className="mt-8 bg-white rounded-[2rem] shadow-xl border-2 border-slate-100 p-6 sm:p-8">
               <div className="flex flex-row w-full gap-1.5 sm:gap-3 justify-between">
-                <button className="flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-200 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                <button 
+                  onClick={() => {
+                    setShowDataStatsSection(prev => !prev);
+                    setTimeout(() => {
+                      const el = document.getElementById('data-stats-section');
+                      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 100);
+                  }}
+                  className="flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-2 border-blue-200 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                >
                   <span className="sm:hidden">數據統計</span>
                   <span className="hidden sm:inline">數據統計</span>
                 </button>
@@ -963,6 +1087,58 @@
                 </button>
               </div>
             </div>
+
+            {/* 新增方塊：數據統計資料 */}
+            {showDataStatsSection && (
+              <div id="data-stats-section" className="mt-8 bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-2 border-slate-100 pb-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <h2 className="text-2xl md:text-3xl tracking-tight text-slate-800 font-black">代課統計資料</h2>
+                    <span className="text-sm md:text-base text-slate-500 font-bold">
+                      (更新日期：{statsUpdateDate || '日-月-年'})
+                    </span>
+                  </div>
+                  <div className="flex items-center shrink-0">
+                    <label className="cursor-pointer bg-blue-50 text-blue-700 hover:bg-blue-100 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-200 flex items-center justify-center">
+                      選擇檔案
+                      <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv" 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="border-2 border-slate-400 rounded-lg overflow-hidden bg-white p-1 shadow-sm">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[50vh] no-scrollbar">
+                    <table className="w-full text-center stat-table text-xs min-[375px]:text-sm sm:text-base md:text-xl font-bold table-auto">
+                      <thead className="relative z-10">
+                        <tr>
+                          <th className="sticky top-0 bg-[#D9D9D9] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">教師代號</th>
+                          <th className="sticky top-0 bg-[#FFF2CC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">缺課日數</th>
+                          <th className="sticky top-0 bg-[#DDEBF7] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">缺課課節</th>
+                          <th className="sticky top-0 bg-[#E2EFDA] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">代課課節</th>
+                          <th className="sticky top-0 bg-[#FCE4D6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">淨值</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {statsData.map((row, idx) => (
+                          <tr key={idx}>
+                            <td className="bg-[#F2F2F2] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{row.teacher}</td>
+                            <td className="bg-[#FFF9E6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentDays)}</td>
+                            <td className="bg-[#EEF5FC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentPeriods)}</td>
+                            <td className="bg-[#F0F7EC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.subPeriods)}</td>
+                            <td className="bg-[#FDF1EB] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.netValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 新增方塊：調課吉堂建議 */}
             {showSwapSuggestionSection && (
