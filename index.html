@@ -53,7 +53,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useRef } = React;
 
     // ==========================================
     // 獨立封裝 Lucide 圖標組 (為了解決 CDN 模組匯入錯誤)
@@ -207,20 +207,54 @@
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
-      // 新增數據統計的狀態與初始值載入
+      // 新增數據統計的狀態與初始值載入 (加入 LocalStorage 支援以保留數據)
       const [showDataStatsSection, setShowDataStatsSection] = useState(false);
-      const [statsUpdateDate, setStatsUpdateDate] = useState("");
-      const [statsData, setStatsData] = useState(() => {
-        // 預設載入所有教師代號並設為0
-        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
-        return allTeachers.map(t => ({
-          teacher: t,
-          absentDays: 0,
-          absentPeriods: 0,
-          subPeriods: 0,
-          netValue: 0
-        }));
+      const [statsUpdateDate, setStatsUpdateDate] = useState(() => {
+        return localStorage.getItem('subSystemStatsDate') || "";
       });
+
+      // 改為使用物件儲存原始狀態，以便後續累積更新 (從 LocalStorage 讀取或預設為0)
+      const [statsRawData, setStatsRawData] = useState(() => {
+        const savedStats = localStorage.getItem('subSystemStats');
+        if (savedStats) {
+          try {
+            return JSON.parse(savedStats);
+          } catch (e) {
+            console.error("無法解析儲存的統計數據", e);
+          }
+        }
+        
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        const initMap = {};
+        allTeachers.forEach(t => {
+          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
+        });
+        return initMap;
+      });
+
+      // 監聽狀態變更並自動儲存至瀏覽器 LocalStorage
+      useEffect(() => {
+        localStorage.setItem('subSystemStats', JSON.stringify(statsRawData));
+      }, [statsRawData]);
+
+      useEffect(() => {
+        localStorage.setItem('subSystemStatsDate', statsUpdateDate);
+      }, [statsUpdateDate]);
+
+      // 由 statsRawData 衍生出供表格顯示的陣列資料
+      const statsData = useMemo(() => {
+        return Object.keys(statsRawData).map(teacher => {
+          const absentPeriods = statsRawData[teacher].absentPeriods;
+          const subPeriods = statsRawData[teacher].subPeriods;
+          return {
+            teacher,
+            absentDays: statsRawData[teacher].absentDates.length,
+            absentPeriods: absentPeriods,
+            subPeriods: subPeriods,
+            netValue: subPeriods - absentPeriods // 淨值計算: 代課課節減去缺課課節
+          };
+        });
+      }, [statsRawData]);
 
       // 新增調課吉堂建議的狀態
       const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
@@ -228,7 +262,31 @@
       const [swapSubTeacher, setSwapSubTeacher] = useState("");
       const [swapSuggestions, setSwapSuggestions] = useState(null);
 
-      // 處理 Excel 檔案匯入與計算
+      const fileInputRef = useRef(null);
+
+      // 匯入檔案按鈕的處理函數 (已解除密碼)
+      const handleImportClick = (e) => {
+        e.preventDefault();
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      };
+
+      // 清空統計資料的處理函數 (已解除密碼)
+      const handleClearStats = () => {
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        const initMap = {};
+        allTeachers.forEach(t => {
+          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
+        });
+        setStatsRawData(initMap);
+        setStatsUpdateDate("");
+        localStorage.removeItem('subSystemStats');
+        localStorage.removeItem('subSystemStatsDate');
+        setAlertMessage("所有統計數據已經清空為0。");
+      };
+
+      // 處理 Excel 檔案匯入與計算 (支援累積與剔除對調課堂)
       const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -242,51 +300,44 @@
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-            const stats = {};
-            
-            // 載入預設教師名單，確保未出現在 Excel 的教師也保留初始值0
-            statsData.forEach(item => {
-              stats[item.teacher] = { absentDates: new Set(), absentPeriods: 0, subPeriods: 0 };
+            setStatsRawData(prevStats => {
+              // 深拷貝現有的狀態以進行累積
+              const nextStats = JSON.parse(JSON.stringify(prevStats));
+
+              jsonData.forEach(row => {
+                // 剔除有對調課堂的列
+                const swapData = row["對調課堂"];
+                if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") {
+                  return; // 跳過此列
+                }
+
+                const date = row["代課日期"];
+                const originalTeacher = row["原任老師"];
+                const substituteTeacher = row["代課老師"];
+                
+                // 檢查節數是否為數字
+                let periods = 1;
+                if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
+                  const parsed = Number(row["節數"]);
+                  periods = isNaN(parsed) ? 1 : parsed;
+                }
+
+                // 累積原任老師 (缺課) 數據
+                if (originalTeacher && nextStats[originalTeacher]) {
+                  if (date && !nextStats[originalTeacher].absentDates.includes(date)) {
+                    nextStats[originalTeacher].absentDates.push(date);
+                  }
+                  nextStats[originalTeacher].absentPeriods += periods;
+                }
+
+                // 累積代課老師 (代課) 數據
+                if (substituteTeacher && nextStats[substituteTeacher]) {
+                  nextStats[substituteTeacher].subPeriods += periods;
+                }
+              });
+
+              return nextStats;
             });
-
-            jsonData.forEach(row => {
-              const date = row["代課日期"];
-              const originalTeacher = row["原任老師"];
-              const substituteTeacher = row["代課老師"];
-              
-              // 修正：檢查節數是否為空白或非數字，避免產生 NaN 導致 React 錯誤
-              let periods = 1;
-              if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
-                const parsed = Number(row["節數"]);
-                periods = isNaN(parsed) ? 1 : parsed;
-              }
-
-              // 計算原任老師 (缺課)
-              if (originalTeacher && stats[originalTeacher]) {
-                if (date) stats[originalTeacher].absentDates.add(date); // Set 會自動過濾同日期的多筆紀錄
-                stats[originalTeacher].absentPeriods += periods;
-              }
-
-              // 計算代課老師 (代課)
-              if (substituteTeacher && stats[substituteTeacher]) {
-                stats[substituteTeacher].subPeriods += periods;
-              }
-            });
-
-            const finalData = Object.keys(stats).map(teacher => {
-              // 修正：加入回退值 (|| 0) 確保輸出絕對是數字
-              const absentPeriods = Number(stats[teacher].absentPeriods) || 0;
-              const subPeriods = Number(stats[teacher].subPeriods) || 0;
-              return {
-                teacher,
-                absentDays: stats[teacher].absentDates.size || 0,
-                absentPeriods: absentPeriods,
-                subPeriods: subPeriods,
-                netValue: subPeriods - absentPeriods // 淨值計算: 代課課節減去缺課課節
-              };
-            });
-
-            setStatsData(finalData);
 
             // 設定更新日期為 日-月-年 (DD-MM-YYYY)
             const today = new Date();
@@ -295,8 +346,11 @@
             const yyyy = today.getFullYear();
             setStatsUpdateDate(`${dd}-${mm}-${yyyy}`);
             
+            // 讀取後清空 input 的值，讓使用者可以再次選擇同一個檔案
+            e.target.value = null;
+
           } catch (error) {
-            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」欄位。");
+            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「對調課堂」等欄位。");
           }
         };
         reader.readAsArrayBuffer(file);
@@ -670,23 +724,23 @@
               <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
                 <Calendar className="text-white w-8 h-8" />
               </div>
-              <div className="flex-1 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-xl font-bold text-blue-600">智能編代課系統v2.2.1</h2>
-                    <div className="flex gap-2">
-                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">全日</button>
-                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-sm transition-colors">半日</button>
+              <div className="flex-1 w-full overflow-hidden">
+                <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
+                <div className="flex flex-row items-center justify-between gap-2 w-full">
+                  <div className="flex flex-row items-center gap-1.5 sm:gap-3 overflow-hidden shrink">
+                    <h2 className="text-[3.8vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v2.2.1</h2>
+                    <div className="flex gap-1 sm:gap-2 shrink-0">
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-[2.8vw] sm:text-sm font-bold py-1 px-2 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
+                      <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-gray-500 hover:bg-gray-600 text-white text-[2.8vw] sm:text-sm font-bold py-1 px-2 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">半日</button>
                     </div>
                   </div>
+                  <button 
+                    onClick={() => { setIsAuthenticated(false); setPasswordInput(""); }} 
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white text-lg sm:text-2xl font-black py-1 sm:py-1.5 px-3 sm:px-6 rounded-xl shadow-sm transition-all whitespace-nowrap shrink-0"
+                  >
+                    登出
+                  </button>
                 </div>
-                <button 
-                  onClick={() => { setIsAuthenticated(false); setPasswordInput(""); }} 
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-2 px-5 rounded-xl shadow-sm transition-all whitespace-nowrap shrink-0"
-                >
-                  登出
-                </button>
               </div>
             </div>
 
@@ -1091,24 +1145,38 @@
             {/* 新增方塊：數據統計資料 */}
             {showDataStatsSection && (
               <div id="data-stats-section" className="mt-8 bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-2 border-slate-100 pb-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <h2 className="text-2xl md:text-3xl tracking-tight text-slate-800 font-black">代課統計資料</h2>
-                    <span className="text-sm md:text-base text-slate-500 font-bold">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-4 border-b-2 border-slate-100 pb-4">
+                  <div className="flex flex-row items-baseline justify-between w-full lg:w-auto gap-2">
+                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課統計資料</h2>
+                    <span className="text-[3vw] sm:text-sm md:text-base text-slate-500 font-bold whitespace-nowrap">
                       (更新日期：{statsUpdateDate || '日-月-年'})
                     </span>
                   </div>
-                  <div className="flex items-center shrink-0">
-                    <label className="cursor-pointer bg-blue-50 text-blue-700 hover:bg-blue-100 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-200 flex items-center justify-center">
-                      選擇檔案
-                      <input 
-                        type="file" 
-                        accept=".xlsx, .xls, .csv" 
-                        onChange={handleFileUpload} 
-                        className="hidden" 
-                      />
-                    </label>
+                  <div className="flex items-center shrink-0 gap-2 w-full lg:w-auto justify-end">
+                    <button 
+                      onClick={handleImportClick}
+                      className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
+                    >
+                      匯入檔案
+                    </button>
+                    <input 
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleFileUpload} 
+                      className="hidden"
+                      ref={fileInputRef}
+                    />
+                    <button 
+                      onClick={handleClearStats}
+                      className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
+                    >
+                      清空
+                    </button>
                   </div>
+                </div>
+                
+                <div className="mb-4 text-[3.5vw] sm:text-sm md:text-base text-slate-500 font-bold">
+                  備註：以下資料僅供參考，實際數據以校方公佈為準。
                 </div>
 
                 <div className="border-2 border-slate-400 rounded-lg overflow-hidden bg-white p-1 shadow-sm">
