@@ -189,7 +189,7 @@
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
-      // 新增調課空堂建議的狀態
+      // 新增調課吉堂建議的狀態
       const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
       const [swapOriginalTeacher, setSwapOriginalTeacher] = useState("");
       const [swapSubTeacher, setSwapSubTeacher] = useState("");
@@ -946,7 +946,7 @@
                   className="flex-1 bg-blue-500 text-white hover:bg-blue-600 border-2 border-blue-500 rounded-lg sm:rounded-xl py-2 px-1 text-xs min-[375px]:text-sm sm:text-base md:text-xl font-black transition-all shadow-sm whitespace-nowrap overflow-hidden text-ellipsis"
                 >
                   <span className="sm:hidden">調放建議</span>
-                  <span className="hidden sm:inline">調課空堂建議</span>
+                  <span className="hidden sm:inline">調課吉堂建議</span>
                 </button>
                 <button 
                   onClick={() => {
@@ -964,14 +964,14 @@
               </div>
             </div>
 
-            {/* 新增方塊：調課空堂建議 */}
+            {/* 新增方塊：調課吉堂建議 */}
             {showSwapSuggestionSection && (
               <div id="swap-suggestion-section" className="mt-8 bg-blue-50 rounded-[3rem] shadow-2xl border border-blue-200 overflow-hidden text-slate-800 w-full animate-in fade-in slide-in-from-top-4 duration-300">
                 <div className="p-5 md:p-10 border-b border-blue-200 bg-gradient-to-br from-blue-100 to-blue-50">
                   <div className="flex flex-row items-center mb-6 md:mb-8">
                     <Calendar className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
                     <h3 className="text-xl md:text-3xl font-black text-blue-900 ml-3 md:ml-4 flex items-center">
-                      調課空堂建議
+                      調課吉堂建議
                       <div className="flex items-center gap-2 ml-2 md:ml-4">
                         <button onClick={() => setShowSwapSuggestionSection(false)} className="w-8 h-8 flex items-center justify-center bg-white border-2 border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-black text-xl leading-none transition-colors shadow-sm">-</button>
                       </div>
@@ -980,7 +980,7 @@
 
                   <div className="flex flex-col md:flex-row gap-3 md:gap-6 mb-6">
                     <div className="flex-1 relative group w-full min-w-0">
-                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">原任：</label>
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">原任老師：</label>
                       <div className="relative">
                         <select
                           value={swapOriginalTeacher}
@@ -997,7 +997,7 @@
                     </div>
 
                     <div className="flex-1 relative group w-full min-w-0">
-                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">代課：</label>
+                      <label className="block text-sm md:text-lg font-bold mb-1 md:mb-3 text-blue-900 truncate">代課老師：</label>
                       <div className="relative">
                         <select
                           value={swapSubTeacher}
