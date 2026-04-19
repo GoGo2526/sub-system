@@ -172,7 +172,7 @@
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
 
-    const DAYS_CONFIG = [
+     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
       { id: 'tue', label: '二', offset: 2 },
       { id: 'wed', label: '三', offset: 3 },
@@ -733,6 +733,7 @@
                       <div className="flex gap-2 sm:gap-2">
                         <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-gray-500 hover:bg-gray-600 text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
                         <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/index-a.html'} className="bg-[#800000] hover:bg-[#600000] text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">半日</button>
+                        <button onClick={() => { setSelectedTeacher(""); setSubRequest(null); }} className="bg-slate-400 hover:bg-slate-500 text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">-</button>
                       </div>
                       <button 
                         onClick={() => { setIsAuthenticated(false); setPasswordInput(""); }} 
@@ -818,6 +819,7 @@
                               <option value="出席會議">出席會議</option>
                               <option value="帶隊比賽">帶隊比賽</option>
                               <option value="境外交流">境外交流</option>
+                              <option value="公務(不計算代課)">公務(不計算代課)</option>
                               <option value="其他">其他</option>
                             </select>
                             <ChevronDown className="w-5 h-5 absolute right-0 text-slate-400 pointer-events-none" />
