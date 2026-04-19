@@ -70,7 +70,22 @@
     const { useState, useMemo, useEffect, useRef } = React;
 
     // ==========================================
-    // 獨立封裝 Lucide 圖標組 (為了解決 CDN 模組匯入錯誤)
+    // 🚨 雲端資料庫 (Firebase) 設定區 🚨
+    // 如果你要在 GitHub Pages 上實現多人跨電腦同步，
+    // 請在此處填寫你自己申請的 Firebase 專案設定。
+    // ==========================================
+   const MY_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB4ZFN81EYCky-OFQfL0tjos9y4_oXoA2E",
+  authDomain: "smr-sub.firebaseapp.com",
+  projectId: "smr-sub",
+  storageBucket: "smr-sub.firebasestorage.app",
+  messagingSenderId: "860123544097",
+  appId: "1:860123544097:web:29414c9d0bc90e71978160",
+  measurementId: "G-28ZL7F4129"
+};
+
+    // ==========================================
+    // 獨立封裝 Lucide 圖標組
     // ==========================================
     const SvgIcon = ({ children, className, size = 24, ...props }) => (
       <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
@@ -223,21 +238,40 @@
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
       const [showDataStatsSection, setShowDataStatsSection] = useState(false);
-      const [statsUpdateDate, setStatsUpdateDate] = useState("");
-
+      
+      // 狀態：從本地緩存嘗試讀取，確保網頁剛開啟就有資料可顯示
       const [statsRawData, setStatsRawData] = useState(() => {
         const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
         const initMap = {};
         allTeachers.forEach(t => {
           initMap[t] = { absencesByDate: {}, subPeriods: 0 };
         });
+
+        // 嘗試從本地緩存讀取 (避免斷網或未設定 Firebase 時完全空白)
+        const savedStats = localStorage.getItem('subSystemStats');
+        if (savedStats) {
+          try {
+            const parsed = JSON.parse(savedStats);
+            Object.keys(parsed).forEach(t => {
+              if (initMap[t]) {
+                initMap[t] = {
+                  absencesByDate: parsed[t].absencesByDate || {},
+                  subPeriods: parsed[t].subPeriods || 0
+                };
+              }
+            });
+          } catch (e) { console.error(e); }
+        }
         return initMap;
+      });
+
+      const [statsUpdateDate, setStatsUpdateDate] = useState(() => {
+         return localStorage.getItem('subSystemStatsDate') || "";
       });
 
       // Firebase 相關狀態
       const [firebaseUser, setFirebaseUser] = useState(null);
       const [db, setDb] = useState(null);
-      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
       // 初始化 Firebase
       useEffect(() => {
@@ -246,28 +280,36 @@
           try {
             const { initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, getFirestore } = window.firebaseModules;
             
-            if (typeof __firebase_config === 'undefined') return;
+            let firebaseConfig;
+            let isCanvasEnvironment = typeof __firebase_config !== 'undefined';
+
+            // 判斷是在 Canvas 環境，還是已導出至 GitHub Pages
+            if (isCanvasEnvironment) {
+              firebaseConfig = JSON.parse(__firebase_config);
+            } else if (MY_FIREBASE_CONFIG.apiKey && MY_FIREBASE_CONFIG.apiKey !== "請替換為你的 apiKey") {
+              firebaseConfig = MY_FIREBASE_CONFIG;
+            } else {
+              console.warn("⚠️ Firebase 未設定，雲端同步無法運作。請在程式碼填寫 MY_FIREBASE_CONFIG。目前僅為單機模式。");
+              return; // 放棄初始化 Firebase，退回本地單機模式
+            }
             
-            const firebaseConfig = JSON.parse(__firebase_config);
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const firestoreDb = getFirestore(app);
             setDb(firestoreDb);
 
-            const initAuth = async () => {
-              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-              } else {
-                await signInAnonymously(auth);
-              }
-            };
-            await initAuth();
+            // GitHub Pages 訪客匿名登入或 Canvas 授權
+            if (isCanvasEnvironment && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+              await signInAnonymously(auth); 
+            }
 
             onAuthStateChanged(auth, (user) => {
               setFirebaseUser(user);
             });
           } catch (e) {
-            console.error("Firebase init error", e);
+            console.error("Firebase 初始化失敗", e);
           }
         };
 
@@ -283,40 +325,54 @@
         if (!firebaseUser || !db || !isAuthenticated) return;
 
         const { doc, onSnapshot } = window.firebaseModules;
-        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'globalStats');
+        // GitHub Pages 上的 appId 可以使用固定字串作為專案識別
+        const finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'sub-system-v3';
+        const statsRef = doc(db, 'artifacts', finalAppId, 'public', 'data', 'stats', 'globalStats');
 
         const unsubscribe = onSnapshot(statsRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data && data.stats) {
               try {
-                setStatsRawData(JSON.parse(data.stats));
+                const parsed = JSON.parse(data.stats);
+                setStatsRawData(parsed);
                 setStatsUpdateDate(data.updateDate || "");
+                // 同步到本地端備份
+                localStorage.setItem('subSystemStats', data.stats);
+                localStorage.setItem('subSystemStatsDate', data.updateDate || "");
               } catch (e) {
-                console.error("Error parsing stats from Firestore", e);
+                console.error("解析雲端數據失敗", e);
               }
             }
           }
         }, (error) => {
-          console.error("Firestore subscription error", error);
+          console.error("雲端訂閱錯誤", error);
         });
 
         return () => unsubscribe();
-      }, [firebaseUser, db, isAuthenticated, appId]);
+      }, [firebaseUser, db, isAuthenticated]);
 
-      // 寫入雲端資料庫功能
+      // 寫入雲端資料庫與本地端
       const saveStatsToCloud = async (newStats, newDate) => {
-        if (!firebaseUser || !db) return;
+        // 永遠先寫入本地備份
+        localStorage.setItem('subSystemStats', JSON.stringify(newStats));
+        localStorage.setItem('subSystemStatsDate', newDate);
+
+        if (!firebaseUser || !db) {
+           console.warn("目前處於單機模式，資料僅存在本機瀏覽器。若要跨裝置同步請設定 Firebase。");
+           return;
+        }
         try {
           const { doc, setDoc } = window.firebaseModules;
-          const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'globalStats');
+          const finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'sub-system-v3';
+          const statsRef = doc(db, 'artifacts', finalAppId, 'public', 'data', 'stats', 'globalStats');
           await setDoc(statsRef, {
             stats: JSON.stringify(newStats),
             updateDate: newDate
           });
         } catch (e) {
-          console.error("Error saving to Firestore", e);
-          setAlertMessage("儲存至雲端失敗，請檢查網路連線。");
+          console.error("儲存至雲端失敗", e);
+          setAlertMessage("儲存至雲端失敗，請檢查 Firebase 權限或網路連線。");
         }
       };
 
@@ -449,11 +505,16 @@
 
           setStatsRawData(nextStats);
           setStatsUpdateDate(newDateStr);
-          saveStatsToCloud(nextStats, newDateStr); // 同步至雲端
+          saveStatsToCloud(nextStats, newDateStr); // 呼叫存檔(同步至雲端與本地)
           
           // 讀取後清空 input 的值，讓使用者可以再次選擇同一個檔案
           e.target.value = null;
-          setAlertMessage(`成功匯入 ${files.length} 個檔案並更新數據。`);
+          
+          if (!firebaseUser || !db) {
+            setAlertMessage(`成功匯入 ${files.length} 個檔案！\n\n(注意：系統目前未設定 Firebase，資料僅儲存於本機)`);
+          } else {
+            setAlertMessage(`成功匯入 ${files.length} 個檔案並已同步更新至雲端！`);
+          }
 
         } catch (error) {
           console.error(error);
@@ -1267,7 +1328,7 @@
               <div id="data-stats-section" className="mt-8 bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-4 border-b-2 border-slate-100 pb-4">
                   <div className="flex flex-row items-baseline justify-between w-full lg:w-auto gap-2">
-                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課統計資料</h2>
+                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課資料統計</h2>
                     <span className="text-[3vw] sm:text-sm md:text-base text-slate-500 font-bold whitespace-nowrap">
                       (更新日期：{statsUpdateDate || '日-月-年'})
                     </span>
