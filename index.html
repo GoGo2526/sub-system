@@ -184,7 +184,7 @@
       ],
     };
 
-      const SCHEDULE_STRUCTURE = [
+       const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
@@ -200,7 +200,6 @@
       { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
     ];
-
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -474,7 +473,10 @@
       // 處理列印報告功能 (開啟新視窗)
       const handlePrintReport = () => {
         const today = new Date();
-        const printDate = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        const printDate = `${dd}-${mm}-${yyyy}`;
         const updateDateStr = statsUpdateDate || '未有資料';
 
         // 將 58 筆資料盡量拆成兩頁 (約 29 筆一頁)
