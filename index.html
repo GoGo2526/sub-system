@@ -184,7 +184,7 @@
       ],
     };
 
-    const SCHEDULE_STRUCTURE = [
+     const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
@@ -468,6 +468,133 @@
         setStatsUpdateDate("");
         saveStatsToCloud(initMap, "");
         setAlertMessage("所有統計數據已經清空，並同步至雲端。");
+      };
+
+      // 處理列印報告功能 (開啟新視窗)
+      const handlePrintReport = () => {
+        const today = new Date();
+        const printDate = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+        const updateDateStr = statsUpdateDate || '未有資料';
+
+        // 將 58 筆資料盡量拆成兩頁 (約 29 筆一頁)
+        const half = Math.ceil(statsData.length / 2);
+        const pages = [statsData.slice(0, half), statsData.slice(half)];
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+          setAlertMessage("彈出視窗被封鎖，請允許彈出視窗以列印報告。");
+          return;
+        }
+
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="zh-HK">
+        <head>
+          <meta charset="UTF-8">
+          <title>代課資料統計報告</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 1.5cm; /* 設定 1.5cm 邊距，並隱藏瀏覽器預設頁首/頁尾 */
+            }
+            body {
+              font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+              color: #0f172a;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .page {
+              page-break-after: always;
+              display: flex;
+              flex-direction: column;
+            }
+            .page:last-child {
+              page-break-after: auto;
+            }
+            .header-container {
+              margin-bottom: 16px;
+              padding-bottom: 8px;
+            }
+            .header-row {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              margin-bottom: 8px;
+            }
+            .title-text {
+              font-size: 24px;
+              font-weight: 900;
+            }
+            .sub-text {
+              font-size: 16px;
+              font-weight: 700;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+            }
+            th, td {
+              border: 1px solid #1e293b;
+              padding: 6px 8px;
+              text-align: center;
+              font-weight: 700;
+            }
+            th {
+              background-color: #f1f5f9;
+              font-weight: 900;
+            }
+          </style>
+        </head>
+        <body>
+          ${pages.map((pageData, index) => `
+          <div class="page">
+            <div class="header-container">
+              <div class="header-row">
+                <span class="title-text">觀塘官立小學(秀明道)</span>
+                <span class="sub-text">列印日期：${printDate}</span>
+              </div>
+              <div class="header-row">
+                <span class="sub-text">代課資料統計 (截至日期：${updateDateStr})</span>
+                <span class="sub-text">第 ${index + 1} 頁</span>
+              </div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>教師代號</th>
+                  <th>缺課日數</th>
+                  <th>缺課課節</th>
+                  <th>代課課節</th>
+                  <th>淨值</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageData.map(row => `
+                <tr>
+                  <td>${row.teacher}</td>
+                  <td>${row.absentDays}</td>
+                  <td>${row.absentPeriods}</td>
+                  <td>${row.subPeriods}</td>
+                  <td>${row.netValue}</td>
+                </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          `).join('')}
+          <script>
+            window.onload = () => {
+              window.print();
+            };
+          <\/script>
+        </body>
+        </html>
+        `;
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
       };
 
       // 處理 Excel 備份檔案匯入 (備份↑)
@@ -990,7 +1117,8 @@
       }
 
       return (
-        <div className="text-slate-900 p-4 md:p-6 font-sans">
+        <>
+        <div id="root-app" className="text-slate-900 p-4 md:p-6 font-sans">
           <header className="max-w-7xl mx-auto mb-10 space-y-6">
             <div className="flex items-start gap-5">
               <div className="bg-blue-600 p-4 rounded-[1.5rem] shadow-xl transform rotate-3">
@@ -1477,6 +1605,12 @@
                       >
                         清空
                       </button>
+                      <button 
+                        onClick={handlePrintReport}
+                        className="cursor-pointer bg-green-600 text-white hover:bg-green-700 font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-green-700 flex items-center justify-center shrink-0"
+                      >
+                        列印報告
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1716,6 +1850,7 @@
             </div>
           )}
         </div>
+        </>
       );
     }
 
