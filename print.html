@@ -67,6 +67,7 @@
 
         /* 控制列 */
         .toolbar {
+            position: -webkit-sticky; /* 增加 iOS 系統的固定支援 */
             position: sticky;
             top: 0;
             z-index: 50;
@@ -75,16 +76,20 @@
             border-bottom: 1px solid #e5e7eb;
         }
 
-        /* 手機觀看版面寬度自動調整 */
+        /* 手機觀看版面寬度與左右滑動設定 */
         @media screen and (max-width: 768px) {
+            html, body {
+                overflow-x: hidden; /* 鎖定網頁整體寬度，確保頂部工具列完全固定不左右偏移 */
+            }
             .preview-area {
-                padding: 0 10px;
+                width: 100%;
+                overflow-x: auto; /* 允許下方的文件區域獨立左右滑動 */
+                -webkit-overflow-scrolling: touch; /* 讓手機(如 iOS)的滑動體驗更順暢 */
+                padding: 10px 0;
             }
             .a4-page {
-                width: 100%;
-                min-height: auto;
-                padding: 15px; /* 縮小手機上的內部留白，提供更多空間給表格 */
-                overflow-x: auto; /* 若內部文字與表格過寬，允許局部左右滑動以維持版面不走位 */
+                margin: 0 10px 20px 10px; /* 在滑動區域內為文件保留適當邊距 */
+                /* width 維持原有的 210mm，確保內部文字與表格不變形，並能觸發滑動 */
             }
         }
 
