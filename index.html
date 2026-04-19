@@ -413,6 +413,7 @@
       const [swapSuggestions, setSwapSuggestions] = useState(null);
 
       const fileInputRef = useRef(null);
+      const backupInputRef = useRef(null);
 
       // 匯入檔案按鈕的處理函數
       const handleImportClick = (e) => {
@@ -420,6 +421,40 @@
         if (fileInputRef.current) {
           fileInputRef.current.click();
         }
+      };
+
+      // 備份↑ 按鈕的處理函數
+      const handleImportBackupClick = (e) => {
+        e.preventDefault();
+        if (backupInputRef.current) {
+          backupInputRef.current.click();
+        }
+      };
+
+      // 備份↓ 匯出備份處理函數
+      const handleExportBackup = () => {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}${mm}${dd}`;
+        const fileName = `REPORT-${dateStr}.xlsx`;
+
+        // 產生符合要求的資料結構
+        const exportData = statsData.map(row => ({
+          "教師代號": row.teacher,
+          "缺課日數": row.absentDays,
+          "缺課課節": row.absentPeriods,
+          "代課課節": row.subPeriods,
+          "淨值": row.netValue
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Backup");
+        XLSX.writeFile(workbook, fileName);
+        
+        setAlertMessage(`成功匯出備份檔案：${fileName}`);
       };
 
       // 清空統計資料的處理函數
@@ -433,6 +468,72 @@
         setStatsUpdateDate("");
         saveStatsToCloud(initMap, "");
         setAlertMessage("所有統計數據已經清空，並同步至雲端。");
+      };
+
+      // 處理 Excel 備份檔案匯入 (備份↑)
+      const handleBackupUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          // 從檔案名稱中提取日期 (例如 REPORT-YYYYMMDD.xlsx)
+          let dateStr = "";
+          const match = file.name.match(/REPORT-(\d{4})(\d{2})(\d{2})/i);
+          if (match) {
+             dateStr = `${match[3]}-${match[2]}-${match[1]}`;
+          } else {
+             const today = new Date();
+             dateStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+          }
+
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          const nextStats = JSON.parse(JSON.stringify(statsRawData));
+
+          jsonData.forEach(row => {
+            const teacher = row["教師代號"];
+            const absentDays = Number(row["缺課日數"]) || 0;
+            const absentPeriods = Number(row["缺課課節"]) || 0;
+            const subPeriods = Number(row["代課課節"]) || 0;
+
+            if (teacher && nextStats[teacher] !== undefined) {
+              // 因為是備份還原，所以覆寫原有資料，並根據缺課日數與課節模擬出 absencesByDate 結構
+              const absencesByDate = {};
+              let remainingPeriods = absentPeriods;
+              for (let i = 0; i < absentDays; i++) {
+                 let p = Math.ceil(remainingPeriods / (absentDays - i));
+                 if (p > 4) p = 4; // 根據規則每天最多計算 4 節
+                 absencesByDate[`BACKUP-${dateStr}-${i}`] = p;
+                 remainingPeriods -= p;
+              }
+              
+              nextStats[teacher] = {
+                 absencesByDate: absencesByDate,
+                 subPeriods: subPeriods
+              };
+            }
+          });
+
+          setStatsRawData(nextStats);
+          setStatsUpdateDate(dateStr);
+          saveStatsToCloud(nextStats, dateStr);
+          
+          e.target.value = null;
+          
+          if (!firebaseUser || !db) {
+            setAlertMessage(`成功還原備份資料！\n\n(注意：系統目前未設定 Firebase，資料僅儲存於本機)`);
+          } else {
+            setAlertMessage(`成功還原備份資料並已同步更新至雲端！`);
+          }
+
+        } catch (error) {
+          console.error(error);
+          setAlertMessage("讀取備份檔案失敗，請確定選擇了正確的 REPORT 備份檔案。");
+        }
       };
 
       // 處理 Excel 檔案匯入與計算 (支援累積、剔除對調課堂與公務例外處理、多檔案匯入)
@@ -1335,10 +1436,30 @@
                   </div>
                   
                   {isAdmin && (
-                    <div className="flex items-center shrink-0 gap-2 w-full lg:w-auto justify-end">
+                    <div className="flex flex-wrap items-center shrink-0 gap-2 w-full lg:w-auto justify-end mt-2 lg:mt-0">
+                      <button 
+                        onClick={handleImportBackupClick}
+                        className="cursor-pointer bg-[#800000] text-white hover:bg-[#600000] font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-[#600000] flex items-center justify-center shrink-0"
+                      >
+                        備份 ↑
+                      </button>
+                      <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv" 
+                        onChange={handleBackupUpload} 
+                        className="hidden"
+                        ref={backupInputRef}
+                      />
+                      <button 
+                        onClick={handleExportBackup}
+                        className="cursor-pointer bg-[#800000] text-white hover:bg-[#600000] font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-[#600000] flex items-center justify-center shrink-0"
+                      >
+                        備份 ↓
+                      </button>
+                      
                       <button 
                         onClick={handleImportClick}
-                        className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
+                        className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
                       >
                         匯入檔案
                       </button>
@@ -1352,7 +1473,7 @@
                       />
                       <button 
                         onClick={handleClearStats}
-                        className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
+                        className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
                       >
                         清空
                       </button>
