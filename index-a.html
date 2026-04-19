@@ -184,7 +184,7 @@
       ],
     };
 
-         const SCHEDULE_STRUCTURE = [
+    const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
@@ -200,7 +200,6 @@
       { type: 'class', id: '8', label: '第八節', time: '11:55 - 12:20', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
-
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -239,6 +238,93 @@
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
       const [showDataStatsSection, setShowDataStatsSection] = useState(false);
+
+      const availableClasses = useMemo(() => {
+        const classes = new Set();
+        const standardClasses = ["1A", "1B", "1C", "1D", "1E", "2A", "2B", "2C", "2D", "2E", "3A", "3B", "3C", "3D", "3E", "4A", "4B", "4C", "4D", "4E", "5A", "5B", "5C", "5D", "5E", "6A", "6B", "6C", "6D", "6E"];
+        standardClasses.forEach(c => classes.add(c));
+        return Array.from(classes).sort();
+      }, []);
+
+      // 快取: 預先計算好的時間表，大幅提升渲染效能
+      const teacherSchedulesCache = useMemo(() => {
+        const cache = {};
+        DAYS_CONFIG.forEach(day => {
+          cache[day.id] = {};
+          const dayData = rawData[day.id] || rawData.mon;
+          const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+          if (!headerRow) return;
+
+          headerRow.forEach((teacher, idx) => {
+            if (idx === 0 || !teacher || teacher.trim() === "") return;
+            cache[day.id][teacher] = SCHEDULE_STRUCTURE.map(slot => {
+              const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
+              return dataRow ? dataRow[idx] || "" : "";
+            });
+          });
+        });
+        return cache;
+      }, [rawData]);
+
+      const getTeacherSchedule = (teacherName, dayId) => {
+        return teacherSchedulesCache[dayId]?.[teacherName] || Array(SCHEDULE_STRUCTURE.length).fill("");
+      };
+
+      const classSchedulesCache = useMemo(() => {
+        const cache = {};
+        DAYS_CONFIG.forEach(day => {
+          cache[day.id] = {};
+          const dayData = rawData[day.id] || rawData.mon;
+          const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+          if (!headerRow) return;
+
+          const classes = ["1A", "1B", "1C", "1D", "1E", "2A", "2B", "2C", "2D", "2E", "3A", "3B", "3C", "3D", "3E", "4A", "4B", "4C", "4D", "4E", "5A", "5B", "5C", "5D", "5E", "6A", "6B", "6C", "6D", "6E"];
+
+          classes.forEach(cls => {
+            cache[day.id][cls] = SCHEDULE_STRUCTURE.map(slot => {
+              if (slot.type === 'break') {
+                return { ...slot, subject: '', teacher: '' };
+              }
+              const dataRow = dayData.find(r => r[0] && r[0].includes(slot.csvKey));
+              let subject = '';
+              let teacher = '';
+              if (dataRow && headerRow) {
+                for (let i = 1; i < dataRow.length; i++) {
+                  const cell = dataRow[i];
+                  if (cell) {
+                    if (cell === cls) {
+                      subject = slot.id === 'HR' ? '班主任節' : slot.label;
+                      teacher = headerRow[i];
+                      break;
+                    } else if (cell.startsWith(cls + '/')) {
+                      subject = cell.split('/')[1];
+                      teacher = headerRow[i];
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (day.id === 'fri' && (slot.id === '8' || slot.id === '9')) {
+                subject = '課外活動';
+              }
+
+              return { ...slot, subject, teacher };
+            });
+          });
+        });
+        return cache;
+      }, [rawData]);
+
+      const getClassSchedule = (cls, dayId) => {
+        return classSchedulesCache[dayId]?.[cls] || [];
+      };
+
+      const isClassOccupied = (content) => {
+        if (!content || content.trim() === "") return false;
+        const busyKeywords = ["BREAK", "REST", "小息", "小休", "午息", "午休", "班主任節"];
+        return !busyKeywords.some(b => content.toUpperCase().includes(b));
+      };
       
       // 狀態：從本地緩存嘗試讀取，確保網頁剛開啟就有資料可顯示
       const [statsRawData, setStatsRawData] = useState(() => {
@@ -790,68 +876,6 @@
         const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
         return headerRow ? headerRow.slice(1).filter(t => t && t.trim() !== "") : [];
       }, [rawData, activeTab]);
-
-      const availableClasses = useMemo(() => {
-        const classes = new Set();
-        const standardClasses = ["1A", "1B", "1C", "1D", "1E", "2A", "2B", "2C", "2D", "2E", "3A", "3B", "3C", "3D", "3E", "4A", "4B", "4C", "4D", "4E", "5A", "5B", "5C", "5D", "5E", "6A", "6B", "6C", "6D", "6E"];
-        standardClasses.forEach(c => classes.add(c));
-        return Array.from(classes).sort();
-      }, []);
-
-      const getTeacherSchedule = (teacherName, dayId) => {
-        const dayData = rawData[dayId] || rawData.mon;
-        const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
-        if (!headerRow) return Array(SCHEDULE_STRUCTURE.length).fill("");
-        const teacherIdx = headerRow.indexOf(teacherName);
-        if (teacherIdx === -1) return Array(SCHEDULE_STRUCTURE.length).fill("");
-        return SCHEDULE_STRUCTURE.map(slot => {
-          const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
-          return dataRow ? dataRow[teacherIdx] || "" : "";
-        });
-      };
-
-      const getClassSchedule = (cls, dayId) => {
-        if (!cls) return [];
-        const dayData = rawData[dayId] || rawData.mon;
-        const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
-        
-        return SCHEDULE_STRUCTURE.map(slot => {
-          if (slot.type === 'break') {
-            return { ...slot, subject: '', teacher: '' };
-          }
-          const dataRow = dayData.find(r => r[0] && r[0].includes(slot.csvKey));
-          let subject = '';
-          let teacher = '';
-          if (dataRow && headerRow) {
-            for (let i = 1; i < dataRow.length; i++) {
-              const cell = dataRow[i];
-              if (cell) {
-                if (cell === cls) {
-                  subject = slot.id === 'HR' ? '班主任節' : slot.label;
-                  teacher = headerRow[i];
-                  break;
-                } else if (cell.startsWith(cls + '/')) {
-                  subject = cell.split('/')[1];
-                  teacher = headerRow[i];
-                  break;
-                }
-              }
-            }
-          }
-
-          if (dayId === 'fri' && (slot.id === '8' || slot.id === '9')) {
-            subject = '課外活動';
-          }
-
-          return { ...slot, subject, teacher };
-        });
-      };
-
-      const isClassOccupied = (content) => {
-        if (!content || content.trim() === "") return false;
-        const busyKeywords = ["BREAK", "REST", "小息", "小休", "午息", "午休", "班主任節"];
-        return !busyKeywords.some(b => content.toUpperCase().includes(b));
-      };
 
       const getAvailableTeachers = (dayId, lessonIdx) => {
         const available = [];
