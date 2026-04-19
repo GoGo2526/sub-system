@@ -75,6 +75,19 @@
             border-bottom: 1px solid #e5e7eb;
         }
 
+        /* 手機觀看版面寬度自動調整 */
+        @media screen and (max-width: 768px) {
+            .preview-area {
+                padding: 0 10px;
+            }
+            .a4-page {
+                width: 100%;
+                min-height: auto;
+                padding: 15px; /* 縮小手機上的內部留白，提供更多空間給表格 */
+                overflow-x: auto; /* 若內部文字與表格過寬，允許局部左右滑動以維持版面不走位 */
+            }
+        }
+
         /* 列印專屬設定 */
         @page {
             size: A4 portrait; /* 預設A4直印 */
@@ -117,7 +130,15 @@
             </div>
             <div>
                 <!-- 更改左上角名稱，加上自動縮放及換行設定 -->
-                <h1 class="text-lg md:text-xl font-bold break-words leading-tight">觀塘官立小學(秀明道)-代課通知單系統</h1>
+                <h1 class="text-lg md:text-xl font-bold break-words leading-tight">
+                    <span class="block md:inline-block">觀塘官立小學(秀明道)</span>
+                    <span class="hidden md:inline-flex items-center">-代課通知單系統
+                        <button onclick="window.history.back()" class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-2 py-0.5 rounded shadow-sm transition-colors cursor-pointer" title="返回上一頁">←</button>
+                    </span>
+                    <span class="md:hidden flex items-center mt-0.5">代課通知單系統
+                        <button onclick="window.history.back()" class="ml-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-2 py-0.5 rounded shadow-sm transition-colors cursor-pointer" title="返回上一頁">←</button>
+                    </span>
+                </h1>
             </div>
         </div>
 
