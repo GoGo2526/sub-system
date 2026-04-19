@@ -184,7 +184,7 @@
       ],
     };
 
-     const SCHEDULE_STRUCTURE = [
+      const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
@@ -200,6 +200,7 @@
       { type: 'class', id: '8', label: '第八節', time: '2:10 - 2:45', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '2:45 - 3:15', csvKey: '9' },
     ];
+
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -495,7 +496,7 @@
           <style>
             @page {
               size: A4 portrait;
-              margin: 1.5cm; /* 設定 1.5cm 邊距，並隱藏瀏覽器預設頁首/頁尾 */
+              margin: 0mm; /* 設定 0mm 隱藏瀏覽器預設的頁首(日期、標題)及頁尾(網址、頁碼) */
             }
             body {
               font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -506,6 +507,8 @@
               print-color-adjust: exact;
             }
             .page {
+              padding: 1.5cm; /* 將 1.5cm 的邊距設定在容器內，保持版面位置不變 */
+              box-sizing: border-box;
               page-break-after: always;
               display: flex;
               flex-direction: column;
