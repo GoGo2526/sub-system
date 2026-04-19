@@ -209,8 +209,22 @@
       { id: 'fri', label: '五', offset: 5 }
     ];
 
-    const MAROON_TEACHERS = ["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"];
-    const GREEN_TEACHERS = ["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"];
+    const MAROON_TEACHERS_SET = new Set(["張", "何", "李", "潘", "黎", "譚", "樊", "文", "鄧", "羅", "梁", "黃", "蔡", "伍", "袁", "皓", "和", "輝"]);
+    const GREEN_TEACHERS_SET = new Set(["達", "豪", "蓮", "廖", "婉", "慧", "Rachel"]);
+
+    const getTeacherTextColor = (name) => {
+      if (MAROON_TEACHERS_SET.has(name)) return 'text-[#800000]';
+      if (GREEN_TEACHERS_SET.has(name)) return 'text-emerald-700';
+      return 'text-black';
+    };
+
+    const isClassOccupied = (content) => {
+      if (!content || content.trim() === "") return false;
+      if (content === "小息" || content === "小休" || content === "午息" || content === "午休" || content === "班主任節" || content === "LUNCH" || content === "REST") return false;
+      const upper = content.toUpperCase();
+      if (upper.includes("BREAK") || upper.includes("REST")) return false;
+      return true;
+    };
 
     // ==========================================
     // 主程式元件
@@ -239,6 +253,14 @@
       
       const [showDataStatsSection, setShowDataStatsSection] = useState(false);
 
+      const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
+      const [swapOriginalTeacher, setSwapOriginalTeacher] = useState("");
+      const [swapSubTeacher, setSwapSubTeacher] = useState("");
+      const [swapSuggestions, setSwapSuggestions] = useState(null);
+
+      const fileInputRef = useRef(null);
+      const backupInputRef = useRef(null);
+
       const availableClasses = useMemo(() => {
         const classes = new Set();
         const standardClasses = ["1A", "1B", "1C", "1D", "1E", "2A", "2B", "2C", "2D", "2E", "3A", "3B", "3C", "3D", "3E", "4A", "4B", "4C", "4D", "4E", "5A", "5B", "5C", "5D", "5E", "6A", "6B", "6C", "6D", "6E"];
@@ -246,8 +268,14 @@
         return Array.from(classes).sort();
       }, []);
 
-      // 快取: 預先計算好的時間表，大幅提升渲染效能
-      const teacherSchedulesCache = useMemo(() => {
+      const teachers = useMemo(() => {
+        const dayData = rawData[activeTab] || rawData.mon;
+        const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+        return headerRow ? headerRow.slice(1).filter(t => t && t.trim() !== "") : [];
+      }, [rawData, activeTab]);
+
+      // 快取 1: 預先計算好的時間表與吉堂狀態，大幅提升渲染效能
+      const schedulesMetaCache = useMemo(() => {
         const cache = {};
         DAYS_CONFIG.forEach(day => {
           cache[day.id] = {};
@@ -257,19 +285,26 @@
 
           headerRow.forEach((teacher, idx) => {
             if (idx === 0 || !teacher || teacher.trim() === "") return;
-            cache[day.id][teacher] = SCHEDULE_STRUCTURE.map(slot => {
+            
+            const schedule = SCHEDULE_STRUCTURE.map(slot => {
               const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
               return dataRow ? dataRow[idx] || "" : "";
             });
+            
+            const occupancy = schedule.map(l => isClassOccupied(l));
+            const totalLessons = occupancy.filter(Boolean).length;
+            
+            cache[day.id][teacher] = {
+              schedule,
+              occupancy,
+              totalLessons
+            };
           });
         });
         return cache;
       }, [rawData]);
 
-      const getTeacherSchedule = (teacherName, dayId) => {
-        return teacherSchedulesCache[dayId]?.[teacherName] || Array(SCHEDULE_STRUCTURE.length).fill("");
-      };
-
+      // 快取 2: 班別時間表
       const classSchedulesCache = useMemo(() => {
         const cache = {};
         DAYS_CONFIG.forEach(day => {
@@ -316,14 +351,60 @@
         return cache;
       }, [rawData]);
 
+      const getTeacherSchedule = (teacherName, dayId) => {
+        return schedulesMetaCache[dayId]?.[teacherName]?.schedule || Array(SCHEDULE_STRUCTURE.length).fill("");
+      };
+
       const getClassSchedule = (cls, dayId) => {
         return classSchedulesCache[dayId]?.[cls] || [];
       };
 
-      const isClassOccupied = (content) => {
-        if (!content || content.trim() === "") return false;
-        const busyKeywords = ["BREAK", "REST", "小息", "小休", "午息", "午休", "班主任節"];
-        return !busyKeywords.some(b => content.toUpperCase().includes(b));
+      const getAvailableTeachers = (dayId, lessonIdx) => {
+        const available = [];
+        const seenNames = new Set();
+        
+        teachers.forEach(t => {
+          if (seenNames.has(t) || t === selectedTeacher) return;
+          const meta = schedulesMetaCache[dayId]?.[t];
+          if (!meta) return;
+          
+          if (!meta.occupancy[lessonIdx]) {
+            const { occupancy, totalLessons } = meta;
+            
+            let prevCount = 0;
+            let hasPrev1Lesson = false;
+            let hasPrev2Lesson = false;
+            for (let i = lessonIdx - 1; i >= 0; i--) {
+              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
+              prevCount++;
+              if (prevCount === 1) hasPrev1Lesson = occupancy[i];
+              if (prevCount === 2) {
+                hasPrev2Lesson = occupancy[i];
+                break;
+              }
+            }
+
+            let nextCount = 0;
+            let hasNext1Lesson = false;
+            let hasNext2Lesson = false;
+            for (let i = lessonIdx + 1; i < occupancy.length; i++) {
+              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
+              nextCount++;
+              if (nextCount === 1) hasNext1Lesson = occupancy[i];
+              if (nextCount === 2) {
+                hasNext2Lesson = occupancy[i];
+                break;
+              }
+            }
+
+            const prevStatus = (hasPrev1Lesson && hasPrev2Lesson) ? 'X' : (hasPrev1Lesson ? 'R' : 'G');
+            const nextStatus = (hasNext1Lesson && hasNext2Lesson) ? 'X' : (hasNext1Lesson ? 'R' : 'G');
+
+            available.push({ id: t, total: totalLessons, prevStatus, nextStatus });
+            seenNames.add(t);
+          }
+        });
+        return available.sort((a, b) => a.total - b.total);
       };
       
       // 狀態：從本地緩存嘗試讀取，確保網頁剛開啟就有資料可顯示
@@ -493,14 +574,55 @@
         });
       }, [statsRawData]);
 
-      // 新增調課吉堂建議的狀態
-      const [showSwapSuggestionSection, setShowSwapSuggestionSection] = useState(false);
-      const [swapOriginalTeacher, setSwapOriginalTeacher] = useState("");
-      const [swapSubTeacher, setSwapSubTeacher] = useState("");
-      const [swapSuggestions, setSwapSuggestions] = useState(null);
+      // --- DOM Memoizations (消除渲染延遲) ---
+      const dataStatsTableJSX = useMemo(() => (
+        <tbody>
+          {statsData.map((row, idx) => (
+            <tr key={idx}>
+              <td className="bg-[#F2F2F2] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{row.teacher}</td>
+              <td className="bg-[#FFF9E6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentDays)}</td>
+              <td className="bg-[#EEF5FC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentPeriods)}</td>
+              <td className="bg-[#F0F7EC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.subPeriods)}</td>
+              <td className="bg-[#FDF1EB] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.netValue)}</td>
+            </tr>
+          ))}
+        </tbody>
+      ), [statsData]);
 
-      const fileInputRef = useRef(null);
-      const backupInputRef = useRef(null);
+      const teacherOptionsWithColorsJSX = useMemo(() => teachers.map((t, idx) => (
+        <option key={`${t}-${idx}`} value={t} className={getTeacherTextColor(t)}>{t}</option>
+      )), [teachers]);
+
+      const teacherOptionsPlainJSX = useMemo(() => teachers.map((t, idx) => (
+        <option key={`${t}-${idx}`} value={t} className="text-slate-900">{t}</option>
+      )), [teachers]);
+
+      const classOptionsJSX = useMemo(() => availableClasses.map((cls, idx) => (
+        <option key={`${cls}-${idx}`} value={cls} className="text-slate-900">{cls}</option>
+      )), [availableClasses]);
+
+      const classScheduleGridJSX = useMemo(() => {
+        if (!selectedClassView) return null;
+        return getClassSchedule(selectedClassView, selectedDayView).map((slot, idx) => {
+          const isBreak = slot.type === 'break';
+          const isLunch = slot.id === 'LUNCH';
+          let rowStyles = "bg-white hover:bg-emerald-50 text-slate-800 border-2 border-slate-500";
+          if (isLunch) {
+            rowStyles = "bg-emerald-700 hover:bg-emerald-800 text-white border-2 border-slate-500";
+          } else if (isBreak) {
+            rowStyles = "bg-emerald-100/80 hover:bg-emerald-200/80 text-emerald-800 border-2 border-slate-500";
+          }
+          return (
+            <div key={idx} className={`grid grid-cols-[0.6fr_1.1fr_3.4fr_0.9fr_1fr] md:grid-cols-5 gap-1 sm:gap-2 md:gap-4 items-center text-center text-[10px] min-[375px]:text-[11px] sm:text-sm md:text-base lg:text-lg font-bold px-0.5 py-1 min-[375px]:px-1 min-[375px]:py-1.5 sm:p-2 md:p-4 rounded-lg md:rounded-2xl transition-all shadow-sm ${rowStyles}`}>
+              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{isBreak ? '--' : selectedClassView}</div>
+              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.label}</div>
+              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.time}</div>
+              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.subject || (isBreak ? slot.label : '--')}</div>
+              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.teacher || '--'}</div>
+            </div>
+          );
+        });
+      }, [selectedClassView, selectedDayView, classSchedulesCache]);
 
       // 匯入檔案按鈕的處理函數
       const handleImportClick = (e) => {
@@ -871,63 +993,6 @@
         };
       }, [activeTab, todayDate]);
 
-      const teachers = useMemo(() => {
-        const dayData = rawData[activeTab] || rawData.mon;
-        const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
-        return headerRow ? headerRow.slice(1).filter(t => t && t.trim() !== "") : [];
-      }, [rawData, activeTab]);
-
-      const getAvailableTeachers = (dayId, lessonIdx) => {
-        const available = [];
-        const seenNames = new Set();
-        teachers.forEach(t => {
-          if (seenNames.has(t) || t === selectedTeacher) return;
-          const schedule = getTeacherSchedule(t, dayId);
-          if (!isClassOccupied(schedule[lessonIdx])) {
-            const totalLessons = schedule.filter(l => isClassOccupied(l)).length;
-            
-            let prevCount = 0;
-            let hasPrev1Lesson = false;
-            let hasPrev2Lesson = false;
-            for (let i = lessonIdx - 1; i >= 0; i--) {
-              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
-              prevCount++;
-              if (prevCount === 1) hasPrev1Lesson = isClassOccupied(schedule[i]);
-              if (prevCount === 2) {
-                hasPrev2Lesson = isClassOccupied(schedule[i]);
-                break;
-              }
-            }
-
-            let nextCount = 0;
-            let hasNext1Lesson = false;
-            let hasNext2Lesson = false;
-            for (let i = lessonIdx + 1; i < schedule.length; i++) {
-              if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
-              nextCount++;
-              if (nextCount === 1) hasNext1Lesson = isClassOccupied(schedule[i]);
-              if (nextCount === 2) {
-                hasNext2Lesson = isClassOccupied(schedule[i]);
-                break;
-              }
-            }
-
-            const prevStatus = (hasPrev1Lesson && hasPrev2Lesson) ? 'X' : (hasPrev1Lesson ? 'R' : 'G');
-            const nextStatus = (hasNext1Lesson && hasNext2Lesson) ? 'X' : (hasNext1Lesson ? 'R' : 'G');
-
-            available.push({ id: t, total: totalLessons, prevStatus, nextStatus });
-            seenNames.add(t);
-          }
-        });
-        return available.sort((a, b) => a.total - b.total);
-      };
-
-      const getTeacherTextColor = (name) => {
-        if (MAROON_TEACHERS.includes(name)) return 'text-[#800000]';
-        if (GREEN_TEACHERS.includes(name)) return 'text-emerald-700';
-        return 'text-black';
-      };
-
       const handleAssignSub = (lessonIdx, subId) => {
         const key = `${activeTab}-${lessonIdx}-${selectedTeacher}`;
         setAssignments(prev => ({ ...prev, [key]: subId }));
@@ -1076,16 +1141,21 @@
 
         const results = {};
         DAYS_CONFIG.forEach(day => {
-          const origSched = getTeacherSchedule(swapOriginalTeacher, day.id);
-          const subSched = getTeacherSchedule(swapSubTeacher, day.id);
+          const origMeta = schedulesMetaCache[day.id]?.[swapOriginalTeacher];
+          const subMeta = schedulesMetaCache[day.id]?.[swapSubTeacher];
+          if (!origMeta || !subMeta) {
+            results[day.id] = "--";
+            return;
+          }
           const matchedSlots = [];
 
           SCHEDULE_STRUCTURE.forEach((slot, idx) => {
             // 略過小息、午休時間，但包括班主任節及午膳時間作比對
             if (slot.type === 'break') return;
             
-            const origOccupied = isClassOccupied(origSched[idx]);
-            const subOccupied = isClassOccupied(subSched[idx]);
+            // 從快取直接讀取是否為吉堂，0延遲
+            const origOccupied = origMeta.occupancy[idx];
+            const subOccupied = subMeta.occupancy[idx];
 
             // 邏輯：比對”代課”的吉堂(!origOccupied) 和”缺課”的要上課(subOccupied)
             // 剔除兩者都有課堂，或兩者都是吉堂的課節
@@ -1191,9 +1261,7 @@
                   className="pl-11 pr-8 py-3.5 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black hover:border-blue-600 outline-none transition-all cursor-pointer appearance-none w-full shadow-sm text-black"
                 >
                   <option value="" disabled>請選擇缺席教師...</option>
-                  {teachers.map((t, idx) => (
-                    <option key={`${t}-${idx}`} value={t} className={getTeacherTextColor(t)}>{t}</option>
-                  ))}
+                  {teacherOptionsWithColorsJSX}
                 </select>
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-blue-600 pointer-events-none" />
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
@@ -1261,11 +1329,12 @@
 
                   <div className="p-8 space-y-4">
                     {SCHEDULE_STRUCTURE.map((slot, idx) => {
-                      const content = getTeacherSchedule(selectedTeacher, activeTab)[idx];
+                      const teacherMeta = schedulesMetaCache[activeTab]?.[selectedTeacher];
+                      const content = teacherMeta?.schedule[idx] || "";
+                      const isActualLesson = teacherMeta?.occupancy[idx] || false;
                       const isBreak = slot.type === 'break';
                       const isSelected = subRequest && subRequest.lessonIdx === idx;
                       const assignedSub = assignments[`${activeTab}-${idx}-${selectedTeacher}`];
-                      const isActualLesson = isClassOccupied(content);
                       
                       let classCode = "", subject = "";
                       if (isActualLesson) {
@@ -1664,17 +1733,7 @@
                           <th className="sticky top-0 bg-[#FCE4D6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-800 font-black shadow-sm outline outline-1 outline-[#888] -outline-offset-1">淨值</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {statsData.map((row, idx) => (
-                          <tr key={idx}>
-                            <td className="bg-[#F2F2F2] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{row.teacher}</td>
-                            <td className="bg-[#FFF9E6] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentDays)}</td>
-                            <td className="bg-[#EEF5FC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.absentPeriods)}</td>
-                            <td className="bg-[#F0F7EC] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.subPeriods)}</td>
-                            <td className="bg-[#FDF1EB] py-2 md:py-3 px-1 sm:px-2 md:px-4 text-slate-700 font-bold">{String(row.netValue)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
+                      {dataStatsTableJSX}
                     </table>
                   </div>
                 </div>
@@ -1705,9 +1764,7 @@
                           className="w-full appearance-none bg-white border-2 border-blue-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-blue-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                         >
                           <option value="" disabled>請選擇...</option>
-                          {teachers.map(t => (
-                            <option key={t} value={t} className="text-slate-900">{t}</option>
-                          ))}
+                          {teacherOptionsPlainJSX}
                         </select>
                         <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-blue-400 pointer-events-none" />
                       </div>
@@ -1722,9 +1779,7 @@
                           className="w-full appearance-none bg-white border-2 border-blue-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-blue-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                         >
                           <option value="" disabled>請選擇...</option>
-                          {teachers.map(t => (
-                            <option key={t} value={t} className="text-slate-900">{t}</option>
-                          ))}
+                          {teacherOptionsPlainJSX}
                         </select>
                         <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-blue-400 pointer-events-none" />
                       </div>
@@ -1781,9 +1836,7 @@
                         className="w-full appearance-none bg-white border-2 border-emerald-200 px-2 py-3 md:px-6 md:py-4 rounded-xl md:rounded-2xl text-sm md:text-xl font-bold text-slate-800 focus:border-emerald-500 outline-none transition-all cursor-pointer shadow-sm truncate"
                       >
                         <option value="" disabled>請選擇班別...</option>
-                        {availableClasses.map(cls => (
-                          <option key={cls} value={cls} className="text-slate-900">{cls}</option>
-                        ))}
+                        {classOptionsJSX}
                       </select>
                       <ChevronDown className="absolute right-2 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 md:w-6 md:h-6 text-emerald-400 pointer-events-none" />
                     </div>
@@ -1819,40 +1872,7 @@
                     </div>
                     
                     <div className="space-y-1.5 md:space-y-3">
-                      {getClassSchedule(selectedClassView, selectedDayView).map((slot, idx) => {
-                        const isBreak = slot.type === 'break';
-                        const isLunch = slot.id === 'LUNCH';
-
-                        let rowStyles = "bg-white hover:bg-emerald-50 text-slate-800 border-2 border-slate-500";
-                        if (isLunch) {
-                          rowStyles = "bg-emerald-700 hover:bg-emerald-800 text-white border-2 border-slate-500";
-                        } else if (isBreak) {
-                          rowStyles = "bg-emerald-100/80 hover:bg-emerald-200/80 text-emerald-800 border-2 border-slate-500";
-                        }
-
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`grid grid-cols-[0.6fr_1.1fr_3.4fr_0.9fr_1fr] md:grid-cols-5 gap-1 sm:gap-2 md:gap-4 items-center text-center text-[10px] min-[375px]:text-[11px] sm:text-sm md:text-base lg:text-lg font-bold px-0.5 py-1 min-[375px]:px-1 min-[375px]:py-1.5 sm:p-2 md:p-4 rounded-lg md:rounded-2xl transition-all shadow-sm ${rowStyles}`}
-                          >
-                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
-                              {isBreak ? '--' : selectedClassView}
-                            </div>
-                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
-                              {slot.label}
-                            </div>
-                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
-                              {slot.time}
-                            </div>
-                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
-                              {slot.subject || (isBreak ? slot.label : '--')}
-                            </div>
-                            <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">
-                              {slot.teacher || '--'}
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {classScheduleGridJSX}
                     </div>
                   </div>
                 </div>
