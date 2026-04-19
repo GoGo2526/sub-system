@@ -172,7 +172,7 @@
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
 
-     const DAYS_CONFIG = [
+    const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
       { id: 'tue', label: '二', offset: 2 },
       { id: 'wed', label: '三', offset: 3 },
@@ -215,20 +215,36 @@
 
       // 改為使用物件儲存原始狀態，以便後續累積更新 (從 LocalStorage 讀取或預設為0)
       const [statsRawData, setStatsRawData] = useState(() => {
+        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+        const initMap = {};
+        allTeachers.forEach(t => {
+          initMap[t] = { absencesByDate: {}, subPeriods: 0 };
+        });
+
         const savedStats = localStorage.getItem('subSystemStats');
         if (savedStats) {
           try {
-            return JSON.parse(savedStats);
+            const parsed = JSON.parse(savedStats);
+            Object.keys(parsed).forEach(t => {
+              if (initMap[t]) {
+                initMap[t] = {
+                  absencesByDate: parsed[t].absencesByDate || {},
+                  subPeriods: parsed[t].subPeriods || 0
+                };
+                // 兼容舊資料格式
+                if (parsed[t].absentDates && Array.isArray(parsed[t].absentDates)) {
+                  parsed[t].absentDates.forEach(date => {
+                    if (!initMap[t].absencesByDate[date]) {
+                      initMap[t].absencesByDate[date] = 1;
+                    }
+                  });
+                }
+              }
+            });
           } catch (e) {
             console.error("無法解析儲存的統計數據", e);
           }
         }
-        
-        const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
-        const initMap = {};
-        allTeachers.forEach(t => {
-          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
-        });
         return initMap;
       });
 
@@ -244,11 +260,26 @@
       // 由 statsRawData 衍生出供表格顯示的陣列資料
       const statsData = useMemo(() => {
         return Object.keys(statsRawData).map(teacher => {
-          const absentPeriods = statsRawData[teacher].absentPeriods;
-          const subPeriods = statsRawData[teacher].subPeriods;
+          const data = statsRawData[teacher];
+          let absentDays = 0;
+          let absentPeriods = 0;
+
+          if (data.absencesByDate) {
+            Object.keys(data.absencesByDate).forEach(date => {
+              const periods = data.absencesByDate[date];
+              if (periods > 0) {
+                absentDays += 1;
+                // (3) 若缺課當天課節多於4個課節，”缺課課節”只計算4個課節
+                absentPeriods += Math.min(periods, 4);
+              }
+            });
+          }
+
+          const subPeriods = data.subPeriods || 0;
+
           return {
             teacher,
-            absentDays: statsRawData[teacher].absentDates.length,
+            absentDays: absentDays,
             absentPeriods: absentPeriods,
             subPeriods: subPeriods,
             netValue: subPeriods - absentPeriods // 淨值計算: 代課課節減去缺課課節
@@ -264,7 +295,7 @@
 
       const fileInputRef = useRef(null);
 
-      // 匯入檔案按鈕的處理函數 (已解除密碼)
+      // 匯入檔案按鈕的處理函數
       const handleImportClick = (e) => {
         e.preventDefault();
         if (fileInputRef.current) {
@@ -272,12 +303,12 @@
         }
       };
 
-      // 清空統計資料的處理函數 (已解除密碼)
+      // 清空統計資料的處理函數
       const handleClearStats = () => {
         const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
         const initMap = {};
         allTeachers.forEach(t => {
-          initMap[t] = { absentDates: [], absentPeriods: 0, subPeriods: 0 };
+          initMap[t] = { absencesByDate: {}, subPeriods: 0 };
         });
         setStatsRawData(initMap);
         setStatsUpdateDate("");
@@ -286,7 +317,7 @@
         setAlertMessage("所有統計數據已經清空為0。");
       };
 
-      // 處理 Excel 檔案匯入與計算 (支援累積與剔除對調課堂)
+      // 處理 Excel 檔案匯入與計算 (支援累積、剔除對調課堂與公務例外處理)
       const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -303,17 +334,26 @@
             setStatsRawData(prevStats => {
               // 深拷貝現有的狀態以進行累積
               const nextStats = JSON.parse(JSON.stringify(prevStats));
+              
+              // 確保所有教師存在
+              teachers.forEach(t => {
+                if (!nextStats[t]) nextStats[t] = { absencesByDate: {}, subPeriods: 0 };
+              });
 
               jsonData.forEach(row => {
-                // 剔除有對調課堂的列
+                // (1) 篩選出沒有”對調課堂”的列，不作計算
                 const swapData = row["對調課堂"];
                 if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") {
-                  return; // 跳過此列
+                  return; // 忽略此列 (對調課堂)
                 }
 
                 const date = row["代課日期"];
                 const originalTeacher = row["原任老師"];
                 const substituteTeacher = row["代課老師"];
+                const reason = String(row["缺課原因"] || "");
+                
+                // (2) 缺席原因為"公務"時，原任老師不計算缺課
+                const isOfficial = reason.includes("公務");
                 
                 // 檢查節數是否為數字
                 let periods = 1;
@@ -322,12 +362,14 @@
                   periods = isNaN(parsed) ? 1 : parsed;
                 }
 
-                // 累積原任老師 (缺課) 數據
-                if (originalTeacher && nextStats[originalTeacher]) {
-                  if (date && !nextStats[originalTeacher].absentDates.includes(date)) {
-                    nextStats[originalTeacher].absentDates.push(date);
+                // 累積原任老師 (缺課) 數據 (若為公務則不計算缺課日數及缺課課節)
+                if (originalTeacher && nextStats[originalTeacher] && !isOfficial) {
+                  if (date) {
+                    if (!nextStats[originalTeacher].absencesByDate[date]) {
+                      nextStats[originalTeacher].absencesByDate[date] = 0;
+                    }
+                    nextStats[originalTeacher].absencesByDate[date] += periods;
                   }
-                  nextStats[originalTeacher].absentPeriods += periods;
                 }
 
                 // 累積代課老師 (代課) 數據
@@ -350,7 +392,7 @@
             e.target.value = null;
 
           } catch (error) {
-            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「對調課堂」等欄位。");
+            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「缺課原因」、「對調課堂」等欄位。");
           }
         };
         reader.readAsArrayBuffer(file);
@@ -1185,8 +1227,11 @@
                   </div>
                 </div>
                 
-                <div className="mb-4 text-[3.5vw] sm:text-sm md:text-base text-slate-500 font-bold">
-                  備註：以下資料僅供參考，實際數據以校方公佈為準。
+                <div className="mb-4 text-[3.5vw] min-[400px]:text-[14px] sm:text-sm md:text-base text-slate-500 font-bold flex flex-col gap-1 w-full leading-snug">
+                  <span>備註：</span>
+                  <span className="pl-2 sm:pl-4">(1) 代課資料僅供參考，實際數據以校方公佈為準。</span>
+                  <span className="pl-2 sm:pl-4">(2) 缺課原因為處理”公務”時，不會計算”缺課日數”及”缺課課節”。</span>
+                  <span className="pl-2 sm:pl-4">(3) 若缺課當天課節多於4個課節，”缺課課節”只計算4個課節。</span>
                 </div>
 
                 <div className="border-2 border-slate-400 rounded-lg overflow-hidden bg-white p-1 shadow-sm">
@@ -1398,7 +1443,7 @@
             )}
           </div>
 
-          {/* 提示訊息彈跳視窗 (已進一步縮小方塊尺寸，但保留原有文字大小設定) */}
+          {/* 提示訊息彈跳視窗 */}
           {alertMessage && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
               <div className="bg-white rounded-[1.25rem] shadow-2xl w-full max-w-[240px] p-4 text-center animate-in zoom-in-95 duration-200">
