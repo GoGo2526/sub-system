@@ -184,7 +184,7 @@
       ],
     };
 
-    const SCHEDULE_STRUCTURE = [
+      const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
@@ -200,6 +200,7 @@
       { type: 'class', id: '8', label: '第八節', time: '11:55 - 12:20', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
+
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -260,6 +261,7 @@
 
       const fileInputRef = useRef(null);
       const backupInputRef = useRef(null);
+      const printFileInputRef = useRef(null);
 
       const availableClasses = useMemo(() => {
         const classes = new Set();
@@ -679,18 +681,25 @@
         setAlertMessage("所有統計數據已經清空，並同步至雲端。");
       };
 
-      // 處理列印報告功能 (開啟新視窗)
-      const handlePrintReport = () => {
+      // 處理列印報告按鈕點擊 (觸發選擇檔案)
+      const handlePrintClick = (e) => {
+        e.preventDefault();
+        if (printFileInputRef.current) {
+          printFileInputRef.current.click();
+        }
+      };
+
+      // 實際產生列印畫面的函式
+      const executePrint = (printData, updateDateStr) => {
         const today = new Date();
         const dd = String(today.getDate()).padStart(2, '0');
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const yyyy = today.getFullYear();
         const printDate = `${dd}-${mm}-${yyyy}`;
-        const updateDateStr = statsUpdateDate || '未有資料';
 
         // 將 58 筆資料盡量拆成兩頁 (約 29 筆一頁)
-        const half = Math.ceil(statsData.length / 2);
-        const pages = [statsData.slice(0, half), statsData.slice(half)];
+        const half = Math.ceil(printData.length / 2);
+        const pages = [printData.slice(0, half), printData.slice(half)];
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
@@ -809,6 +818,103 @@
         `;
         printWindow.document.write(htmlContent);
         printWindow.document.close();
+      };
+
+      // 處理列印用的 Excel 檔案匯入
+      const handlePrintFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          let dateStr = "";
+          const match = file.name.match(/REPORT-(\d{4})(\d{2})(\d{2})/i);
+          if (match) {
+             dateStr = `${match[3]}-${match[2]}-${match[1]}`;
+          } else {
+             const today = new Date();
+             dateStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`;
+          }
+
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+          let printData = [];
+          if (jsonData.length > 0 && jsonData[0]["淨值"] !== undefined) {
+             // 備份檔案格式
+             printData = jsonData.map(row => ({
+                teacher: row["教師代號"] || "",
+                absentDays: Number(row["缺課日數"]) || 0,
+                absentPeriods: Number(row["缺課課節"]) || 0,
+                subPeriods: Number(row["代課課節"]) || 0,
+                netValue: Number(row["淨值"]) || 0
+             })).filter(r => r.teacher);
+          } else {
+             // 原始代課檔案格式
+             const tempStats = {};
+             const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
+             allTeachers.forEach(t => { tempStats[t] = { absencesByDate: {}, subPeriods: 0 }; });
+
+             jsonData.forEach(row => {
+               const swapData = row["對調課堂"];
+               if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") return;
+
+               const date = row["代課日期"];
+               const originalTeacher = row["原任老師"];
+               const substituteTeacher = row["代課老師"];
+               const reason = String(row["缺課原因"] || "");
+               const isOfficial = reason.includes("公務");
+               
+               let periods = 1;
+               if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
+                 const parsed = Number(row["節數"]);
+                 periods = isNaN(parsed) ? 1 : parsed;
+               }
+
+               if (originalTeacher && tempStats[originalTeacher] && !isOfficial) {
+                 if (date) {
+                   if (!tempStats[originalTeacher].absencesByDate[date]) tempStats[originalTeacher].absencesByDate[date] = 0;
+                   tempStats[originalTeacher].absencesByDate[date] += periods;
+                 }
+               }
+               if (substituteTeacher && tempStats[substituteTeacher]) {
+                 tempStats[substituteTeacher].subPeriods += periods;
+               }
+             });
+
+             printData = Object.keys(tempStats).map(teacher => {
+               const data = tempStats[teacher];
+               let absentDays = 0;
+               let absentPeriods = 0;
+               if (data.absencesByDate) {
+                 Object.keys(data.absencesByDate).forEach(date => {
+                   const p = data.absencesByDate[date];
+                   if (p > 0) {
+                     absentDays += 1;
+                     absentPeriods += Math.min(p, 4);
+                   }
+                 });
+               }
+               const subPeriods = data.subPeriods || 0;
+               return {
+                 teacher,
+                 absentDays,
+                 absentPeriods,
+                 subPeriods,
+                 netValue: subPeriods - absentPeriods
+               };
+             });
+          }
+
+          executePrint(printData, dateStr);
+          e.target.value = null;
+
+        } catch (error) {
+          console.error(error);
+          setAlertMessage("讀取檔案失敗，無法列印。請確定檔案格式正確。");
+        }
       };
 
       // 處理 Excel 備份檔案匯入 (備份↑)
@@ -1705,11 +1811,18 @@
                         清空
                       </button>
                       <button 
-                        onClick={handlePrintReport}
+                        onClick={handlePrintClick}
                         className="cursor-pointer bg-green-600 text-white hover:bg-green-700 font-black py-2.5 px-3 sm:px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-green-700 flex items-center justify-center shrink-0"
                       >
                         列印報告
                       </button>
+                      <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv" 
+                        onChange={handlePrintFileUpload} 
+                        className="hidden"
+                        ref={printFileInputRef}
+                      />
                     </div>
                   )}
                 </div>
