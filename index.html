@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v2.2.1</title>
+  <title>智能編代課系統v.3.1.2</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,20 @@
 
   <!-- 引入 SheetJS (XLSX) 用於解析 Excel 檔案 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- 引入 Firebase 雲端資料庫模組 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window.firebaseModules = {
+      initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged,
+      getFirestore, doc, setDoc, onSnapshot, collection
+    };
+    window.firebaseLoaded = true;
+    if (window.onFirebaseLoaded) window.onFirebaseLoaded();
+  </script>
 
   <style>
     /* 隱藏捲軸但保留滾動功能 */
@@ -197,6 +211,7 @@
       const [leaveReasons, setLeaveReasons] = useState({});
       const [todayDate, setTodayDate] = useState(new Date());
       const [isAuthenticated, setIsAuthenticated] = useState(false);
+      const [isAdmin, setIsAdmin] = useState(false);
       const [passwordInput, setPasswordInput] = useState("");
       const [showPassword, setShowPassword] = useState(false);
       const [loginError, setLoginError] = useState("");
@@ -207,55 +222,103 @@
       const [isClassScheduleVisible, setIsClassScheduleVisible] = useState(true);
       const [showClassScheduleSection, setShowClassScheduleSection] = useState(false);
       
-      // 新增數據統計的狀態與初始值載入 (加入 LocalStorage 支援以保留數據)
       const [showDataStatsSection, setShowDataStatsSection] = useState(false);
-      const [statsUpdateDate, setStatsUpdateDate] = useState(() => {
-        return localStorage.getItem('subSystemStatsDate') || "";
-      });
+      const [statsUpdateDate, setStatsUpdateDate] = useState("");
 
-      // 改為使用物件儲存原始狀態，以便後續累積更新 (從 LocalStorage 讀取或預設為0)
       const [statsRawData, setStatsRawData] = useState(() => {
         const allTeachers = INITIAL_RAW_DATA.mon.find(row => row[0] === "教師代號").slice(1).filter(t => t && t.trim() !== "");
         const initMap = {};
         allTeachers.forEach(t => {
           initMap[t] = { absencesByDate: {}, subPeriods: 0 };
         });
-
-        const savedStats = localStorage.getItem('subSystemStats');
-        if (savedStats) {
-          try {
-            const parsed = JSON.parse(savedStats);
-            Object.keys(parsed).forEach(t => {
-              if (initMap[t]) {
-                initMap[t] = {
-                  absencesByDate: parsed[t].absencesByDate || {},
-                  subPeriods: parsed[t].subPeriods || 0
-                };
-                // 兼容舊資料格式
-                if (parsed[t].absentDates && Array.isArray(parsed[t].absentDates)) {
-                  parsed[t].absentDates.forEach(date => {
-                    if (!initMap[t].absencesByDate[date]) {
-                      initMap[t].absencesByDate[date] = 1;
-                    }
-                  });
-                }
-              }
-            });
-          } catch (e) {
-            console.error("無法解析儲存的統計數據", e);
-          }
-        }
         return initMap;
       });
 
-      // 監聽狀態變更並自動儲存至瀏覽器 LocalStorage
-      useEffect(() => {
-        localStorage.setItem('subSystemStats', JSON.stringify(statsRawData));
-      }, [statsRawData]);
+      // Firebase 相關狀態
+      const [firebaseUser, setFirebaseUser] = useState(null);
+      const [db, setDb] = useState(null);
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+      // 初始化 Firebase
       useEffect(() => {
-        localStorage.setItem('subSystemStatsDate', statsUpdateDate);
-      }, [statsUpdateDate]);
+        const initFirebase = async () => {
+          if (!window.firebaseModules) return;
+          try {
+            const { initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, getFirestore } = window.firebaseModules;
+            
+            if (typeof __firebase_config === 'undefined') return;
+            
+            const firebaseConfig = JSON.parse(__firebase_config);
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const firestoreDb = getFirestore(app);
+            setDb(firestoreDb);
+
+            const initAuth = async () => {
+              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+              } else {
+                await signInAnonymously(auth);
+              }
+            };
+            await initAuth();
+
+            onAuthStateChanged(auth, (user) => {
+              setFirebaseUser(user);
+            });
+          } catch (e) {
+            console.error("Firebase init error", e);
+          }
+        };
+
+        if (window.firebaseLoaded) {
+          initFirebase();
+        } else {
+          window.onFirebaseLoaded = initFirebase;
+        }
+      }, []);
+
+      // 訂閱雲端資料庫更新
+      useEffect(() => {
+        if (!firebaseUser || !db || !isAuthenticated) return;
+
+        const { doc, onSnapshot } = window.firebaseModules;
+        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'globalStats');
+
+        const unsubscribe = onSnapshot(statsRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data && data.stats) {
+              try {
+                setStatsRawData(JSON.parse(data.stats));
+                setStatsUpdateDate(data.updateDate || "");
+              } catch (e) {
+                console.error("Error parsing stats from Firestore", e);
+              }
+            }
+          }
+        }, (error) => {
+          console.error("Firestore subscription error", error);
+        });
+
+        return () => unsubscribe();
+      }, [firebaseUser, db, isAuthenticated, appId]);
+
+      // 寫入雲端資料庫功能
+      const saveStatsToCloud = async (newStats, newDate) => {
+        if (!firebaseUser || !db) return;
+        try {
+          const { doc, setDoc } = window.firebaseModules;
+          const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'globalStats');
+          await setDoc(statsRef, {
+            stats: JSON.stringify(newStats),
+            updateDate: newDate
+          });
+        } catch (e) {
+          console.error("Error saving to Firestore", e);
+          setAlertMessage("儲存至雲端失敗，請檢查網路連線。");
+        }
+      };
 
       // 由 statsRawData 衍生出供表格顯示的陣列資料
       const statsData = useMemo(() => {
@@ -312,90 +375,90 @@
         });
         setStatsRawData(initMap);
         setStatsUpdateDate("");
-        localStorage.removeItem('subSystemStats');
-        localStorage.removeItem('subSystemStatsDate');
-        setAlertMessage("所有統計數據已經清空為0。");
+        saveStatsToCloud(initMap, "");
+        setAlertMessage("所有統計數據已經清空，並同步至雲端。");
       };
 
-      // 處理 Excel 檔案匯入與計算 (支援累積、剔除對調課堂與公務例外處理)
-      const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+      // 處理 Excel 檔案匯入與計算 (支援累積、剔除對調課堂與公務例外處理、多檔案匯入)
+      const handleFileUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try {
-            const data = new Uint8Array(evt.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
+        try {
+          // 拷貝現有的狀態以進行累積
+          const nextStats = JSON.parse(JSON.stringify(statsRawData));
+          
+          // 確保所有教師存在
+          teachers.forEach(t => {
+            if (!nextStats[t]) nextStats[t] = { absencesByDate: {}, subPeriods: 0 };
+          });
+
+          // 循序處理每個檔案
+          for (const file of files) {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-            setStatsRawData(prevStats => {
-              // 深拷貝現有的狀態以進行累積
-              const nextStats = JSON.parse(JSON.stringify(prevStats));
+            jsonData.forEach(row => {
+              // (1) 篩選出沒有”對調課堂”的列，不作計算
+              const swapData = row["對調課堂"];
+              if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") {
+                return; // 忽略此列 (對調課堂)
+              }
+
+              const date = row["代課日期"];
+              const originalTeacher = row["原任老師"];
+              const substituteTeacher = row["代課老師"];
+              const reason = String(row["缺課原因"] || "");
               
-              // 確保所有教師存在
-              teachers.forEach(t => {
-                if (!nextStats[t]) nextStats[t] = { absencesByDate: {}, subPeriods: 0 };
-              });
+              // (2) 缺席原因為"公務"時，原任老師不計算缺課
+              const isOfficial = reason.includes("公務");
+              
+              // 檢查節數是否為數字
+              let periods = 1;
+              if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
+                const parsed = Number(row["節數"]);
+                periods = isNaN(parsed) ? 1 : parsed;
+              }
 
-              jsonData.forEach(row => {
-                // (1) 篩選出沒有”對調課堂”的列，不作計算
-                const swapData = row["對調課堂"];
-                if (swapData !== undefined && swapData !== null && String(swapData).trim() !== "") {
-                  return; // 忽略此列 (對調課堂)
-                }
-
-                const date = row["代課日期"];
-                const originalTeacher = row["原任老師"];
-                const substituteTeacher = row["代課老師"];
-                const reason = String(row["缺課原因"] || "");
-                
-                // (2) 缺席原因為"公務"時，原任老師不計算缺課
-                const isOfficial = reason.includes("公務");
-                
-                // 檢查節數是否為數字
-                let periods = 1;
-                if (row["節數"] !== undefined && row["節數"] !== null && row["節數"] !== "") {
-                  const parsed = Number(row["節數"]);
-                  periods = isNaN(parsed) ? 1 : parsed;
-                }
-
-                // 累積原任老師 (缺課) 數據 (若為公務則不計算缺課日數及缺課課節)
-                if (originalTeacher && nextStats[originalTeacher] && !isOfficial) {
-                  if (date) {
-                    if (!nextStats[originalTeacher].absencesByDate[date]) {
-                      nextStats[originalTeacher].absencesByDate[date] = 0;
-                    }
-                    nextStats[originalTeacher].absencesByDate[date] += periods;
+              // 累積原任老師 (缺課) 數據 (若為公務則不計算缺課日數及缺課課節)
+              if (originalTeacher && nextStats[originalTeacher] && !isOfficial) {
+                if (date) {
+                  if (!nextStats[originalTeacher].absencesByDate[date]) {
+                    nextStats[originalTeacher].absencesByDate[date] = 0;
                   }
+                  nextStats[originalTeacher].absencesByDate[date] += periods;
                 }
+              }
 
-                // 累積代課老師 (代課) 數據
-                if (substituteTeacher && nextStats[substituteTeacher]) {
-                  nextStats[substituteTeacher].subPeriods += periods;
-                }
-              });
-
-              return nextStats;
+              // 累積代課老師 (代課) 數據
+              if (substituteTeacher && nextStats[substituteTeacher]) {
+                nextStats[substituteTeacher].subPeriods += periods;
+              }
             });
-
-            // 設定更新日期為 日-月-年 (DD-MM-YYYY)
-            const today = new Date();
-            const dd = String(today.getDate()).padStart(2, '0');
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const yyyy = today.getFullYear();
-            setStatsUpdateDate(`${dd}-${mm}-${yyyy}`);
-            
-            // 讀取後清空 input 的值，讓使用者可以再次選擇同一個檔案
-            e.target.value = null;
-
-          } catch (error) {
-            setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「缺課原因」、「對調課堂」等欄位。");
           }
-        };
-        reader.readAsArrayBuffer(file);
+
+          // 設定更新日期為 日-月-年 (DD-MM-YYYY)
+          const today = new Date();
+          const dd = String(today.getDate()).padStart(2, '0');
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const yyyy = today.getFullYear();
+          const newDateStr = `${dd}-${mm}-${yyyy}`;
+
+          setStatsRawData(nextStats);
+          setStatsUpdateDate(newDateStr);
+          saveStatsToCloud(nextStats, newDateStr); // 同步至雲端
+          
+          // 讀取後清空 input 的值，讓使用者可以再次選擇同一個檔案
+          e.target.value = null;
+          setAlertMessage(`成功匯入 ${files.length} 個檔案並更新數據。`);
+
+        } catch (error) {
+          console.error(error);
+          setAlertMessage("讀取檔案失敗，請確定檔案為 Excel 格式，且包含「代課日期」、「原任老師」、「代課老師」、「節數」、「缺課原因」、「對調課堂」等欄位。");
+        }
       };
 
       // 已移除定時器 setInterval，解決原生小月曆在週末被強制鎖定或關閉的問題
@@ -669,6 +732,11 @@
         e.preventDefault();
         if (passwordInput === 'Smr-2026') {
           setIsAuthenticated(true);
+          setIsAdmin(true); // 管理員權限
+          setLoginError("");
+        } else if (passwordInput === 'Smr-12345') {
+          setIsAuthenticated(true);
+          setIsAdmin(false); // 一般使用者權限
           setLoginError("");
         } else {
           setLoginError("密碼錯誤，請重新輸入。");
@@ -770,7 +838,7 @@
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden shrink w-full sm:w-auto">
-                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v2.2.1</h2>
+                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v.3.1.2</h2>
                     <div className="flex flex-row items-center justify-between w-full sm:w-auto shrink-0">
                       <div className="flex gap-2 sm:gap-2">
                         <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
@@ -1199,32 +1267,36 @@
               <div id="data-stats-section" className="mt-8 bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border-2 border-slate-200 animate-in fade-in slide-in-from-top-4 duration-300">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 gap-4 border-b-2 border-slate-100 pb-4">
                   <div className="flex flex-row items-baseline justify-between w-full lg:w-auto gap-2">
-                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課資料統計</h2>
+                    <h2 className="text-[4.5vw] sm:text-2xl md:text-3xl tracking-tight text-slate-800 font-black whitespace-nowrap">代課統計資料</h2>
                     <span className="text-[3vw] sm:text-sm md:text-base text-slate-500 font-bold whitespace-nowrap">
                       (更新日期：{statsUpdateDate || '日-月-年'})
                     </span>
                   </div>
-                  <div className="flex items-center shrink-0 gap-2 w-full lg:w-auto justify-end">
-                    <button 
-                      onClick={handleImportClick}
-                      className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
-                    >
-                      匯入檔案
-                    </button>
-                    <input 
-                      type="file" 
-                      accept=".xlsx, .xls, .csv" 
-                      onChange={handleFileUpload} 
-                      className="hidden"
-                      ref={fileInputRef}
-                    />
-                    <button 
-                      onClick={handleClearStats}
-                      className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
-                    >
-                      清空
-                    </button>
-                  </div>
+                  
+                  {isAdmin && (
+                    <div className="flex items-center shrink-0 gap-2 w-full lg:w-auto justify-end">
+                      <button 
+                        onClick={handleImportClick}
+                        className="cursor-pointer bg-blue-800 text-white hover:bg-blue-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-blue-900 flex items-center justify-center shrink-0"
+                      >
+                        匯入檔案
+                      </button>
+                      <input 
+                        type="file" 
+                        accept=".xlsx, .xls, .csv"
+                        multiple 
+                        onChange={handleFileUpload} 
+                        className="hidden"
+                        ref={fileInputRef}
+                      />
+                      <button 
+                        onClick={handleClearStats}
+                        className="cursor-pointer bg-purple-800 text-white hover:bg-purple-900 font-black py-2.5 px-5 rounded-xl shadow-sm transition-all text-sm md:text-base border border-purple-900 flex items-center justify-center shrink-0"
+                      >
+                        清空
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mb-4 text-[3.5vw] min-[400px]:text-[14px] sm:text-sm md:text-base text-slate-500 font-bold flex flex-col gap-1 w-full leading-snug">
