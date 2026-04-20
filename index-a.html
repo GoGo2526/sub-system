@@ -180,11 +180,11 @@
       ["LUNCH", "","","","","5C/午膳","6B/午膳","5B/午膳","","","1D/午膳","","","","1A/午膳","4B/午膳","5A/午膳","4A/午膳","","6A/午膳","","","6D/午膳","6C/午膳","6E/午膳","","","","","5E/午膳","","","4C/午膳","","4E/午膳","3A/午膳","3B/午膳","3C/午膳","3D/午膳","3E/午膳","","2B/午膳","2C/午膳","2D/午膳","2E/午膳","","1B/午膳","1C/午膳","","1E/午膳","4D/午膳","5D/午膳","","","","2A/午膳",""],
       ["7", "4C/導修","5B/導修","","1C/導修","","P6/數補","","","4D/導修","6A/導修","","","","6C/導修","6B/導修","","","2E/導修","","","","6D/導修","3A/導修","6E/導修","5A/導修","3E/導修","5C/導修","1A/導修","5E/導修","4A/導修","4B/導修","","","4E/導修","","3B/導修","3C/導修","","","","1B/導修","","2D/導修","","","2B/導修","","1D/導修","1E/導修","5D/導修","","2C/導修","3D/導修","P3/數補","2A/導修",""],
       ["8", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
-      ["9", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
+      ["9", "","","","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ ","課外活動/ "],
       ],
     };
 
-      const SCHEDULE_STRUCTURE = [
+       const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
@@ -200,7 +200,6 @@
       { type: 'class', id: '8', label: '第八節', time: '11:55 - 12:20', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
-
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -439,6 +438,9 @@
          return localStorage.getItem('subSystemStatsDate') || "";
       });
 
+      // 新增：用於記錄上一次的字串狀態，防止重複渲染導致系統遲緩
+      const lastStatsStringRef = useRef(localStorage.getItem('subSystemStats') || "");
+
       // Firebase 相關狀態
       const [firebaseUser, setFirebaseUser] = useState(null);
       const [db, setDb] = useState(null);
@@ -490,9 +492,9 @@
         }
       }, []);
 
-      // 訂閱雲端資料庫更新
+      // 訂閱雲端資料庫更新 (優化：只有開啟「數據統計」時才啟動監聽，減少讀取次數與卡頓)
       useEffect(() => {
-        if (!firebaseUser || !db || !isAuthenticated) return;
+        if (!firebaseUser || !db || !isAuthenticated || !showDataStatsSection) return;
 
         const { doc, onSnapshot } = window.firebaseModules;
         // GitHub Pages 上的 appId 可以使用固定字串作為專案識別
@@ -503,15 +505,19 @@
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data && data.stats) {
-              try {
-                const parsed = JSON.parse(data.stats);
-                setStatsRawData(parsed);
-                setStatsUpdateDate(data.updateDate || "");
-                // 同步到本地端備份
-                localStorage.setItem('subSystemStats', data.stats);
-                localStorage.setItem('subSystemStatsDate', data.updateDate || "");
-              } catch (e) {
-                console.error("解析雲端數據失敗", e);
+              // 優化核心：只有當雲端數據真的與當前不同才解析並觸發重新渲染
+              if (data.stats !== lastStatsStringRef.current) {
+                lastStatsStringRef.current = data.stats;
+                try {
+                  const parsed = JSON.parse(data.stats);
+                  setStatsRawData(parsed);
+                  setStatsUpdateDate(data.updateDate || "");
+                  // 同步到本地端備份
+                  localStorage.setItem('subSystemStats', data.stats);
+                  localStorage.setItem('subSystemStatsDate', data.updateDate || "");
+                } catch (e) {
+                  console.error("解析雲端數據失敗", e);
+                }
               }
             }
           }
@@ -520,13 +526,15 @@
         });
 
         return () => unsubscribe();
-      }, [firebaseUser, db, isAuthenticated]);
+      }, [firebaseUser, db, isAuthenticated, showDataStatsSection]); // 加入 showDataStatsSection 控制讀取
 
       // 寫入雲端資料庫與本地端
       const saveStatsToCloud = async (newStats, newDate) => {
+        const statsString = JSON.stringify(newStats);
         // 永遠先寫入本地備份
-        localStorage.setItem('subSystemStats', JSON.stringify(newStats));
+        localStorage.setItem('subSystemStats', statsString);
         localStorage.setItem('subSystemStatsDate', newDate);
+        lastStatsStringRef.current = statsString; // 更新防護變數
 
         if (!firebaseUser || !db) {
            console.warn("目前處於單機模式，資料僅存在本機瀏覽器。若要跨裝置同步請設定 Firebase。");
@@ -537,7 +545,7 @@
           const finalAppId = typeof __app_id !== 'undefined' ? __app_id : 'sub-system-v3';
           const statsRef = doc(db, 'artifacts', finalAppId, 'public', 'data', 'stats', 'globalStats');
           await setDoc(statsRef, {
-            stats: JSON.stringify(newStats),
+            stats: statsString, // 直接使用已經轉換好的字串
             updateDate: newDate
           });
         } catch (e) {
@@ -1562,7 +1570,7 @@
                                 {getAvailableTeachers(activeTab, idx).map((sub, sIdx) => (
                                   <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className="bg-white p-6 rounded-2xl border-2 border-orange-300 hover:border-[#800000] hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden">
                                     <div className="flex items-center gap-2 mb-3">
-                                        {sub.prevStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="前兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.prevStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.prevStatus === 'R' ? '前一節有課' : '前一節無課'}></div>}
+                                        {sub.prevStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="前兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.prevStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.prevStatus === 'R' ? '前一節有課' : '後一節無課'}></div>}
                                         <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)}`}>{sub.id}</span>
                                         {sub.nextStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="後兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.nextStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.nextStatus === 'R' ? '後一節有課' : '後一節無課'}></div>}
                                     </div>
