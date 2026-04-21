@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v.3.1.2</title>
+  <title>智能編代課系統v.3.1.4</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -1274,10 +1274,36 @@
             // 邏輯：比對”代課”的吉堂(!origOccupied) 和”缺課”的要上課(subOccupied)
             // 剔除兩者都有課堂，或兩者都是吉堂的課節
             if (!origOccupied && subOccupied) {
-              matchedSlots.push(slot.label);
+              const content = subMeta.schedule[idx];
+              let classCode = "";
+              let subject = "";
+              
+              if (content && content.includes('/')) {
+                [classCode, subject] = content.split('/');
+              } else if (content) {
+                classCode = content;
+              }
+              
+              let displayStr = "";
+              if (day.id === 'fri' && (slot.id === '8' || slot.id === '9')) {
+                // 星期五第八節及第九節只需列出「課外活動」
+                displayStr = "課外活動";
+              } else if (slot.id === 'HR' || slot.id === 'LUNCH' || slot.id === 'REST') {
+                // 班主任節及午膳只需列出班別
+                displayStr = classCode.trim();
+              } else {
+                // 一般課節列出班別及科目
+                if (classCode && subject) {
+                  displayStr = `${classCode.trim()} ${subject.trim()}`;
+                } else {
+                  displayStr = content ? content.trim() : "";
+                }
+              }
+              
+              matchedSlots.push(`${slot.label}(${displayStr})`);
             }
           });
-          results[day.id] = matchedSlots.length > 0 ? matchedSlots.join(", ") : "--";
+          results[day.id] = matchedSlots.length > 0 ? matchedSlots : null;
         });
         setSwapSuggestions(results);
       };
@@ -1342,7 +1368,7 @@
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden shrink w-full sm:w-auto">
-                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v.3.1.2</h2>
+                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v.3.1.4</h2>
                     <div className="flex flex-row items-center justify-between w-full sm:w-auto shrink-0">
                       <div className="flex gap-2 sm:gap-2">
                         <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
@@ -1920,12 +1946,21 @@
                     <div className="p-4 sm:p-6 md:p-8 bg-white/60 rounded-2xl md:rounded-3xl border-2 border-blue-200 shadow-sm w-full">
                       <h4 className="text-lg md:text-2xl font-black text-blue-900 mb-4 border-b-2 border-blue-300 pb-2">建議清單 ({swapOriginalTeacher}) → ({swapSubTeacher})</h4>
                       <div className="flex flex-col gap-2 md:gap-4 text-sm md:text-lg lg:text-xl font-bold text-slate-800">
-                        {DAYS_CONFIG.map(day => (
-                          <div key={day.id} className="flex gap-4 md:gap-8 items-start">
-                            <div className="text-blue-800 font-black min-w-[60px] md:min-w-[80px]">星期{day.label}</div>
-                            <div className="text-slate-700 break-words">{swapSuggestions[day.id]}</div>
-                          </div>
-                        ))}
+                        {DAYS_CONFIG.map(day => {
+                          const slots = swapSuggestions[day.id];
+                          return (
+                            <div key={day.id} className="flex gap-4 md:gap-8 items-start">
+                              <div className="text-blue-800 font-black min-w-[60px] md:min-w-[80px]">星期{day.label}</div>
+                              <div className="text-slate-700 flex flex-wrap gap-x-2 gap-y-1 flex-1">
+                                {slots ? slots.map((slot, i) => (
+                                  <span key={i} className="whitespace-nowrap">
+                                    {slot}{i < slots.length - 1 ? ',' : ''}
+                                  </span>
+                                )) : <span>--</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
