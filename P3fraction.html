@@ -2,15 +2,14 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>三年級數學 - 分數大挑戰</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數大挑戰 - 專業教學版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body {
             font-family: 'Noto+Sans+TC', sans-serif;
             background-color: #f1f5f9;
-            touch-action: manipulation;
         }
         .fraction-num { border-bottom: 3px solid #1e293b; padding: 0 4px; min-width: 35px; text-align: center; }
         .fraction-den { padding: 0 4px; min-width: 35px; text-align: center; }
@@ -24,7 +23,6 @@
             align-items: center;
             justify-content: center;
             background-color: #ffffff;
-            position: relative;
         }
         .drop-zone.active {
             border-color: #3b82f6;
@@ -33,35 +31,25 @@
         }
         .draggable {
             cursor: grab;
-            touch-action: none; /* 重要：防止觸控時頁面捲動 */
+            touch-action: none;
             user-select: none;
-            z-index: 10;
         }
         .draggable:active { cursor: grabbing; }
-        .dragging {
-            opacity: 0.5;
-            transform: scale(1.1);
-        }
         
         @keyframes bounce-slow {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
         }
         .animate-bounce-slow { animation: bounce-slow 2s infinite; }
-
-        .qr-overlay {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(10px);
-        }
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <div id="game-app" class="max-w-5xl mx-auto bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200 min-h-[600px] flex flex-col">
+    <div id="game-app" class="max-w-5xl mx-auto bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-200">
         <!-- 頂部狀態列 -->
-        <div id="status-bar" class="bg-gradient-to-r from-indigo-600 to-blue-700 text-white p-6 flex justify-between items-center hidden">
+        <div class="bg-gradient-to-r from-indigo-600 to-blue-700 text-white p-6 flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-black tracking-tight">分數大挑戰</h1>
-                <p id="level-text" class="text-blue-100 text-sm font-bold mt-1">比賽進行中</p>
+                <p id="level-text" class="text-blue-100 text-sm font-bold mt-1">載入中...</p>
             </div>
             <div class="flex gap-8">
                 <div class="text-center">
@@ -70,62 +58,36 @@
                 </div>
                 <div class="text-center">
                     <p class="text-[10px] uppercase font-bold opacity-70">倒數</p>
-                    <p id="timer" class="text-4xl font-black text-yellow-300">--</p>
+                    <p id="timer" class="text-4xl font-black text-yellow-300">60</p>
                 </div>
             </div>
         </div>
 
-        <!-- 1. 初始模式選擇畫面 -->
-        <div id="start-screen" class="p-8 md:p-16 flex flex-col items-center justify-center flex-1 text-center">
-            <div class="mb-8">
-                <div class="text-6xl mb-4">🍕</div>
-                <h2 class="text-5xl font-black text-slate-800 leading-tight mb-2">分數排列大挑戰</h2>
-                <p class="text-slate-500 font-bold text-xl">請選擇比賽模式開始</p>
+        <!-- 初始畫面 -->
+        <div id="start-screen" class="p-16 text-center">
+            <div class="mb-8 inline-block p-6 bg-indigo-50 rounded-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
             </div>
+            <h2 class="text-4xl font-black mb-6 text-slate-800">準備好進行比賽了嗎？</h2>
             
-            <div class="max-w-md w-full space-y-6">
-                <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                    <label class="block text-slate-600 font-bold mb-2">預設比賽總題數：</label>
-                    <input type="number" id="total-levels-input" value="10" min="5" max="30" class="w-full text-center text-2xl font-black p-3 rounded-xl border-2 border-indigo-100 focus:border-indigo-500 outline-none">
-                </div>
+            <div class="max-w-sm mx-auto mb-10 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                <label class="block text-slate-600 font-bold mb-2">設定比賽總題數：</label>
+                <input type="number" id="total-levels-input" value="10" min="1" max="50" class="w-full text-center text-2xl font-black p-3 rounded-xl border-2 border-indigo-200 focus:border-indigo-500 outline-none">
+            </div>
 
-                <div class="grid grid-cols-1 gap-4">
-                    <button onclick="prepareGame('random')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 rounded-2xl font-black text-xl transition-all shadow-xl hover:shadow-indigo-200">
-                        建立隨機比賽 (出現QR Code)
-                    </button>
-                    <button onclick="showTeacherMode()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-8 py-5 rounded-2xl font-bold text-xl transition-all">
-                        建立自訂題目比賽
-                    </button>
-                </div>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button onclick="startGame('random')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-2xl font-black text-xl transition-all shadow-xl hover:shadow-indigo-200">開始隨機比賽</button>
+                <button onclick="showTeacherMode()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-10 py-5 rounded-2xl font-bold text-xl transition-all">進入教師預設</button>
             </div>
         </div>
 
-        <!-- 2. QR Code 等待進入畫面 -->
-        <div id="qr-screen" class="hidden fixed inset-0 z-50 qr-overlay flex flex-col items-center justify-center p-8 text-center">
-            <div class="max-w-2xl w-full">
-                <h2 class="text-4xl font-black text-indigo-900 mb-2">比賽已就緒！</h2>
-                <p class="text-slate-500 text-xl font-bold mb-8">請學生使用平板掃描下方 QR Code 加入</p>
-                
-                <div class="bg-white p-8 rounded-[3rem] shadow-2xl border-4 border-indigo-100 inline-block mb-10">
-                    <div id="qr-code-box" class="min-w-[250px] min-h-[250px] flex items-center justify-center">
-                        <!-- QR Code 將生成在此 -->
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <button onclick="finalStart()" class="w-full bg-green-500 hover:bg-green-600 text-white py-6 rounded-3xl font-black text-3xl shadow-xl transition-transform hover:scale-105 active:scale-95">
-                        所有人已加入，正式開始！
-                    </button>
-                    <button onclick="cancelPrepare()" class="text-slate-400 font-bold hover:text-slate-600">返回修改設定</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 3. 遊戲進行畫面 -->
-        <div id="game-screen" class="hidden p-8 flex-1">
+        <!-- 遊戲畫面 -->
+        <div id="game-screen" class="hidden p-8">
             <div class="text-center mb-10">
                 <div id="sort-order-badge" class="inline-block px-6 py-2 rounded-full text-white font-black text-lg mb-4 shadow-md">
-                    載入中...
+                    正在載入順序...
                 </div>
                 <h3 id="main-instruction" class="text-3xl font-black text-slate-800">請按順序排列分數</h3>
             </div>
@@ -140,45 +102,49 @@
         </div>
 
         <!-- 教師面板 -->
-        <div id="teacher-panel" class="hidden fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div class="bg-white rounded-[2.5rem] w-full max-w-2xl p-10 shadow-2xl">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-3xl font-black">教師題目自訂</h3>
-                    <button onclick="hideTeacherMode()" class="text-slate-300 hover:text-slate-600 text-2xl">✖</button>
-                </div>
-                <p class="text-slate-500 mb-6 font-bold">每行一題，分數用逗號隔開（如 1/2, 2/3）。</p>
-                <textarea id="preset-input" class="w-full h-48 p-6 border-2 rounded-2xl mb-6 font-mono text-lg focus:ring-4 focus:ring-indigo-100 outline-none" placeholder="1/2, 1/3, 1/4&#10;2/5, 4/5&#10;3/7, 3/8, 3/10"></textarea>
-                <button onclick="savePresets()" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-xl hover:bg-indigo-700 transition-all shadow-lg">保存並進入比賽 (出現QR Code)</button>
+        <div id="teacher-panel" class="hidden p-10 bg-slate-50 border-t">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-black">教師題目自訂</h3>
+                <button onclick="hideTeacherMode()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✖</button>
             </div>
+            <p class="text-slate-500 mb-4 font-bold italic">規則：每行一題，分數用逗號隔開（如 1/2, 2/3）。系統會自動決定排列順序。</p>
+            <textarea id="preset-input" class="w-full h-48 p-6 border-2 rounded-2xl mb-6 font-mono text-lg focus:ring-4 focus:ring-indigo-100 outline-none" placeholder="1/2, 1/3, 1/4&#10;2/5, 4/5&#10;3/7, 3/8, 3/10"></textarea>
+            <button onclick="savePresets()" class="w-full bg-slate-800 text-white py-5 rounded-2xl font-black text-xl hover:bg-black transition-all shadow-lg">保存題目並開始比賽</button>
         </div>
 
         <!-- 反饋彈窗 -->
-        <div id="feedback-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-[60]">
-            <div class="bg-white rounded-[3rem] p-10 max-w-4xl w-full shadow-2xl border-4 border-white text-center">
-                <div id="feedback-icon" class="text-8xl mb-4"></div>
-                <h3 id="feedback-title" class="text-4xl font-black mb-6"></h3>
-                <div id="logic-hint" class="block w-full p-8 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-[2rem] text-2xl font-black mb-8"></div>
-                <div class="p-8 bg-slate-100 rounded-[2rem] mb-8">
+        <div id="feedback-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-[3rem] p-10 max-w-4xl w-full shadow-2xl border-4 border-white">
+                <div class="text-center mb-8">
+                    <div id="feedback-icon" class="text-8xl mb-4"></div>
+                    <h3 id="feedback-title" class="text-4xl font-black mb-6"></h3>
+                    <div id="logic-hint" class="block w-full p-8 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-[2rem] text-2xl font-black leading-snug shadow-inner"></div>
+                </div>
+
+                <div class="p-8 bg-slate-100 rounded-[2rem] border border-slate-200 mb-8">
+                    <p id="visual-label" class="text-center font-black text-slate-500 mb-6 uppercase tracking-widest text-sm">正確的分數排列與圖像</p>
                     <div id="correct-visual" class="flex justify-center flex-wrap gap-8"></div>
                 </div>
-                <button onclick="nextLevel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-2xl font-black text-2xl shadow-xl">繼續挑戰下一題</button>
+
+                <button onclick="nextLevel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-2xl font-black text-2xl shadow-xl transition-all">繼續挑戰下一題</button>
             </div>
         </div>
 
         <!-- 結算畫面 -->
-        <div id="end-screen" class="hidden p-16 text-center flex-1">
+        <div id="end-screen" class="hidden p-16 text-center">
             <div id="result-icon" class="text-9xl mb-8 animate-bounce-slow"></div>
-            <h2 id="result-comment" class="text-5xl font-black mb-6"></h2>
+            <h2 id="result-comment" class="text-5xl font-black mb-6">評語載入中</h2>
             <div class="inline-block px-12 py-4 bg-slate-100 rounded-3xl mb-12">
-                <p class="text-2xl font-bold text-slate-500">最終得分</p>
+                <p class="text-2xl font-bold text-slate-500">百分比得分</p>
                 <p id="final-score" class="text-7xl font-black text-indigo-600">0</p>
             </div>
-            <button onclick="location.reload()" class="block mx-auto bg-indigo-600 text-white px-16 py-6 rounded-3xl font-black text-2xl shadow-2xl hover:scale-105 transition-transform">返回主選單</button>
+            <div id="result-subtext" class="text-xl text-slate-500 mb-12 max-w-md mx-auto leading-relaxed"></div>
+            <button onclick="location.reload()" class="bg-indigo-600 text-white px-16 py-6 rounded-3xl font-black text-2xl shadow-2xl hover:scale-105 transition-transform">重新挑戰</button>
         </div>
     </div>
 
     <script>
-        let score = 0; 
+        let score = 0; // 實際顯示分數 (0-100)
         let timeLeft = 60;
         let timerInterval;
         let currentLevel = 0;
@@ -187,72 +153,47 @@
         let draggedElement = null;
         let isAscending = true;
 
-        // 觸控拖拽變數
-        let touchOffsetX = 0;
-        let touchOffsetY = 0;
-        let originalParent = null;
-
-        // 生成 QR Code
-        function generateQRCode() {
-            const currentUrl = window.location.href;
-            const qrBox = document.getElementById('qr-code-box');
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(currentUrl)}`;
-            qrBox.innerHTML = `<img src="${qrUrl}" class="w-64 h-64 shadow-lg rounded-xl" alt="Game QR Code">`;
-        }
-
-        // 準備階段 (顯示 QR Code)
-        function prepareGame(mode) {
-            if (mode === 'random') {
-                totalLevelsCount = parseInt(document.getElementById('total-levels-input').value) || 10;
-                levels = generateRandomLevels(totalLevelsCount);
+        function createFractionPie(n, d, size = 100, color = "#4f46e5") {
+            const radius = 16;
+            const cx = 16;
+            const cy = 16;
+            const percentage = n / d;
+            let slices = '';
+            for (let i = 0; i < d; i++) {
+                const angle = (2 * Math.PI * i) / d;
+                const x2 = cx + radius * Math.sin(angle);
+                const y2 = cy - radius * Math.cos(angle);
+                slices += `<line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="#cbd5e1" stroke-width="0.6" />`;
             }
-            
-            // 顯示 QR Code 畫面
-            document.getElementById('qr-screen').classList.remove('hidden');
-            generateQRCode();
-        }
-
-        function cancelPrepare() {
-            document.getElementById('qr-screen').classList.add('hidden');
-        }
-
-        // 正式開始
-        function finalStart() {
-            document.getElementById('qr-screen').classList.add('hidden');
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('status-bar').classList.remove('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            
-            score = 0;
-            currentLevel = 0;
-            updateScoreDisplay();
-            loadLevel();
-            startTimer();
+            const endAngle = 2 * Math.PI * percentage;
+            const x = cx + radius * Math.sin(endAngle);
+            const y = cy - radius * Math.cos(endAngle);
+            const largeArcFlag = percentage > 0.5 ? 1 : 0;
+            const pathData = (percentage === 1) ? `M ${cx} ${cy-radius} A ${radius} ${radius} 0 1 1 ${cx-0.01} ${cy-radius} Z` : (percentage === 0) ? "" : `M ${cx} ${cy} L ${cx} ${cy - radius} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x} ${y} Z`;
+            return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" class="rounded-full bg-white shadow-md border-2 border-slate-800"><circle cx="${cx}" cy="${cy}" r="${radius}" fill="#f8fafc" /><path d="${pathData}" fill="${color}" />${slices}<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#1e293b" stroke-width="1.2" /></svg>`;
         }
 
         function generateRandomLevels(count) {
+            const types = ['same_den', 'same_num', 'diff'];
             let result = [];
             for(let i=0; i<count; i++) {
-                let type, numCount, fracs = [];
-                const difficulty = i / count;
-                if (difficulty < 0.3) { type = 'same_den'; numCount = 2; }
-                else if (difficulty < 0.6) { type = Math.random() > 0.5 ? 'same_den' : 'same_num'; numCount = Math.random() > 0.7 ? 3 : 2; }
-                else { const rand = Math.random(); type = rand < 0.3 ? 'same_den' : rand < 0.6 ? 'same_num' : 'diff'; numCount = 3; }
-
+                const type = types[i % types.length];
+                const numCount = (i >= count/2) ? 3 : 2;
+                let fracs = [];
                 if (type === 'same_den') {
-                    const d = Math.floor(Math.random() * 8) + 3;
+                    const d = Math.floor(Math.random() * 9) + 4;
                     let nums = new Set();
                     while(nums.size < numCount) nums.add(Math.floor(Math.random() * (d-1)) + 1);
                     fracs = Array.from(nums).map(n => ({ n, d }));
                 } else if (type === 'same_num') {
-                    const n = Math.floor(Math.random() * 3) + 1;
+                    const n = Math.floor(Math.random() * 4) + 1;
                     let dens = new Set();
-                    while(dens.size < numCount) dens.add(Math.floor(Math.random() * 8) + 4);
+                    while(dens.size < numCount) dens.add(Math.floor(Math.random() * 8) + 5);
                     fracs = Array.from(dens).map(d => ({ n, d }));
                 } else {
                     let used = new Set();
                     while(fracs.length < numCount) {
-                        const d = Math.floor(Math.random() * 10) + 2;
+                        const d = Math.floor(Math.random() * 11) + 2;
                         const n = Math.floor(Math.random() * (d - 1)) + 1;
                         if(!used.has(`${n}/${d}`)) { used.add(`${n}/${d}`); fracs.push({n, d}); }
                     }
@@ -262,8 +203,24 @@
             return result;
         }
 
+        function startGame(mode) {
+            if (mode === 'random') {
+                totalLevelsCount = parseInt(document.getElementById('total-levels-input').value) || 10;
+                levels = generateRandomLevels(totalLevelsCount);
+            } else {
+                totalLevelsCount = levels.length;
+            }
+            score = 0;
+            currentLevel = 0;
+            updateScoreDisplay();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            loadLevel();
+            startTimer();
+        }
+
         function startTimer() {
-            timeLeft = 60 + (levels.length * 10); 
+            timeLeft = 60 + (totalLevelsCount * 2); // 根據題數稍微調整時間
             document.getElementById('timer').innerText = timeLeft;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
@@ -274,39 +231,31 @@
         }
 
         function loadLevel() {
-            if (currentLevel >= levels.length) { endGame(); return; }
+            if (currentLevel >= levels.length) {
+                endGame();
+                return;
+            }
             const data = levels[currentLevel];
             isAscending = data.isAscending;
             const badge = document.getElementById('sort-order-badge');
             badge.innerText = isAscending ? "從小到大 ⬆️" : "從大到小 ⬇️";
             badge.className = isAscending ? "inline-block px-6 py-2 rounded-full text-white font-black text-lg mb-4 shadow-md bg-green-500" : "inline-block px-6 py-2 rounded-full text-white font-black text-lg mb-4 shadow-md bg-orange-500";
-            document.getElementById('level-text').innerText = `第 ${currentLevel + 1} / ${levels.length} 題`;
+            document.getElementById('level-text').innerText = `進度：第 ${currentLevel + 1} 題 / 共 ${levels.length} 題`;
             document.getElementById('submit-btn').disabled = true;
-            
             const pool = document.getElementById('fraction-pool');
             pool.innerHTML = '';
             [...data.fractions].sort(() => Math.random() - 0.5).forEach((f, idx) => {
                 const card = document.createElement('div');
-                card.className = "fraction-container bg-white border-4 border-slate-200 p-6 rounded-[1.5rem] shadow-sm draggable hover:border-indigo-400 transform transition-transform active:scale-95";
+                card.className = "fraction-container bg-white border-4 border-slate-200 p-6 rounded-[1.5rem] shadow-sm draggable hover:border-indigo-400";
                 card.draggable = true;
                 card.id = `f-${idx}`;
                 card.dataset.n = f.n;
                 card.dataset.d = f.d;
                 card.dataset.val = f.n / f.d;
-                card.innerHTML = `<div class="fraction-num text-3xl font-black">${f.n}</div><div class="fraction-den text-3xl font-black">${f.d}</div>`;
-                
-                // 桌機拖拽
-                card.addEventListener('dragstart', e => { draggedElement = card; e.dataTransfer.setData('text/plain', card.id); card.classList.add('dragging'); });
-                card.addEventListener('dragend', () => card.classList.remove('dragging'));
-
-                // 平板觸控拖拽
-                card.addEventListener('touchstart', handleTouchStart, {passive: false});
-                card.addEventListener('touchmove', handleTouchMove, {passive: false});
-                card.addEventListener('touchend', handleTouchEnd, {passive: false});
-
+                card.innerHTML = `<div class="fraction-num text-3xl font-black text-slate-800">${f.n}</div><div class="fraction-den text-3xl font-black text-slate-800">${f.d}</div>`;
+                card.addEventListener('dragstart', e => { draggedElement = card; e.dataTransfer.setData('text/plain', card.id); });
                 pool.appendChild(card);
             });
-
             const dropArea = document.getElementById('drop-area');
             dropArea.innerHTML = '';
             data.fractions.forEach((_, i) => {
@@ -320,7 +269,7 @@
                     zone.classList.remove('active');
                     if (zone.hasChildNodes()) pool.appendChild(zone.firstChild);
                     zone.appendChild(draggedElement);
-                    checkZonesFull();
+                    document.getElementById('submit-btn').disabled = !Array.from(document.querySelectorAll('.drop-zone')).every(z => z.hasChildNodes());
                 });
                 dropArea.appendChild(zone);
                 if (i < data.fractions.length - 1) {
@@ -332,88 +281,20 @@
             });
         }
 
-        // 觸控處理邏輯
-        function handleTouchStart(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            draggedElement = e.currentTarget;
-            originalParent = draggedElement.parentElement;
-            
-            const rect = draggedElement.getBoundingClientRect();
-            touchOffsetX = touch.clientX - rect.left;
-            touchOffsetY = touch.clientY - rect.top;
-            
-            draggedElement.classList.add('dragging');
-            draggedElement.style.position = 'fixed';
-            draggedElement.style.width = rect.width + 'px';
-            draggedElement.style.height = rect.height + 'px';
-            updateTouchPosition(touch.clientX, touch.clientY);
-        }
-
-        function handleTouchMove(e) {
-            e.preventDefault();
-            const touch = e.touches[0];
-            updateTouchPosition(touch.clientX, touch.clientY);
-            
-            // 視覺反饋：檢查是否在任何 drop-zone 上方
-            const zones = document.querySelectorAll('.drop-zone');
-            zones.forEach(zone => {
-                const r = zone.getBoundingClientRect();
-                if (touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) {
-                    zone.classList.add('active');
-                } else {
-                    zone.classList.remove('active');
-                }
-            });
-        }
-
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            draggedElement.classList.remove('dragging');
-            draggedElement.style.position = '';
-            draggedElement.style.width = '';
-            draggedElement.style.height = '';
-            draggedElement.style.left = '';
-            draggedElement.style.top = '';
-
-            let dropped = false;
-            const zones = document.querySelectorAll('.drop-zone');
-            const pool = document.getElementById('fraction-pool');
-
-            zones.forEach(zone => {
-                zone.classList.remove('active');
-                const r = zone.getBoundingClientRect();
-                if (touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) {
-                    if (zone.hasChildNodes()) pool.appendChild(zone.firstChild);
-                    zone.appendChild(draggedElement);
-                    dropped = true;
-                }
-            });
-
-            if (!dropped) {
-                pool.appendChild(draggedElement);
-            }
-            checkZonesFull();
-        }
-
-        function updateTouchPosition(x, y) {
-            draggedElement.style.left = (x - touchOffsetX) + 'px';
-            draggedElement.style.top = (y - touchOffsetY) + 'px';
-        }
-
-        function checkZonesFull() {
-            const zones = document.querySelectorAll('.drop-zone');
-            document.getElementById('submit-btn').disabled = !Array.from(zones).every(z => z.hasChildNodes());
-        }
-
         function checkAnswer() {
             const zones = document.querySelectorAll('.drop-zone');
             const userF = Array.from(zones).map(z => ({ n: parseInt(z.firstChild.dataset.n), d: parseInt(z.firstChild.dataset.d), val: parseFloat(z.firstChild.dataset.val) }));
             const correctF = [...userF].sort((a, b) => isAscending ? a.val - b.val : b.val - a.val);
             const isCorrect = userF.every((f, i) => Math.abs(f.val - correctF[i].val) < 0.0001);
-            
-            let hint = levels[currentLevel].type === 'same_den' ? "比較同分母時，分子越大，分數越大。" : levels[currentLevel].type === 'same_num' ? "比較同分子時，分母越大，每一份反而越小。" : "分子分母不同時，可以觀察圓餅圖的大小。";
+            let hint = "";
+            const data = levels[currentLevel];
+            if (data.type === 'same_den') hint = "比較同分母分數時，分子越大，分數數值越大。";
+            else if (data.type === 'same_num') hint = "比較同分子分數時，分母越大，分數數值越小。";
+            else {
+                const values = userF.map(f => f.val);
+                const isEquiv = values.every(v => Math.abs(v - values[0]) < 0.0001);
+                hint = isEquiv ? "比較等值分數時，將圖案分成相同等份。" : "比較不同分數時，以圖像形式直接比較。";
+            }
             showFeedback(isCorrect, correctF, hint);
         }
 
@@ -423,52 +304,87 @@
             const title = document.getElementById('feedback-title');
             const logicHint = document.getElementById('logic-hint');
             const correctVisual = document.getElementById('correct-visual');
-            
             correctVisual.innerHTML = '';
             correctF.forEach((f, i) => {
                 const wrap = document.createElement('div');
-                wrap.className = "flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-sm";
-                wrap.innerHTML = `${createFractionPie(f.n, f.d, 100, isCorrect ? '#10b981' : '#ef4444')}<div class="text-xl font-black">${f.n}/${f.d}</div>`;
+                wrap.className = "flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100";
+                wrap.innerHTML = `${createFractionPie(f.n, f.d, 110, isCorrect ? '#10b981' : '#4f46e5')}<div class="flex flex-col items-center"><div class="text-2xl font-black border-b-2 border-slate-800 px-2">${f.n}</div><div class="text-2xl font-black px-2">${f.d}</div></div>`;
                 correctVisual.appendChild(wrap);
                 if(i < correctF.length - 1) {
                     const arrow = document.createElement('div');
-                    arrow.className = "flex items-center text-2xl font-black text-slate-300";
+                    arrow.className = "flex items-center text-3xl font-black text-slate-300";
                     arrow.innerHTML = isAscending ? "&lt;" : "&gt;";
                     correctVisual.appendChild(arrow);
                 }
             });
-
-            if (isCorrect) { score += Math.floor(100 / levels.length); icon.innerText = "❤️"; title.innerText = "正確！"; title.className = "text-5xl font-black text-green-600 mb-6"; }
-            else { icon.innerText = "💡"; title.innerText = "再加油！"; title.className = "text-5xl font-black text-orange-500 mb-6"; }
+            if (isCorrect) {
+                // 每題計分 = 100 / 總題數 (無條件捨去至整數)
+                score += Math.floor(100 / totalLevelsCount);
+                icon.innerText = "❤️";
+                title.innerText = "正確！做得好";
+                title.className = "text-5xl font-black mb-6 text-green-600";
+            } else {
+                icon.innerText = "💡";
+                title.innerText = "別灰心，看這裡！";
+                title.className = "text-5xl font-black mb-6 text-orange-500";
+            }
             logicHint.innerText = hint;
             updateScoreDisplay();
             overlay.classList.remove('hidden');
         }
 
-        function createFractionPie(n, d, size = 100, color = "#4f46e5") {
-            const radius = 16, cx = 16, cy = 16, percentage = n / d;
-            let slices = '';
-            for (let i = 0; i < d; i++) {
-                const angle = (2 * Math.PI * i) / d;
-                slices += `<line x1="${cx}" y1="${cy}" x2="${cx + radius * Math.sin(angle)}" y2="${cy - radius * Math.cos(angle)}" stroke="#cbd5e1" stroke-width="0.5" />`;
-            }
-            const endAngle = 2 * Math.PI * percentage, x = cx + radius * Math.sin(endAngle), y = cy - radius * Math.cos(endAngle);
-            const pathData = (percentage === 1) ? `M ${cx} ${cy-radius} A ${radius} ${radius} 0 1 1 ${cx-0.01} ${cy-radius} Z` : `M ${cx} ${cy} L ${cx} ${cy - radius} A ${radius} ${radius} 0 ${percentage > 0.5 ? 1 : 0} 1 ${x} ${y} Z`;
-            return `<svg width="${size}" height="${size}" viewBox="0 0 32 32"><circle cx="${cx}" cy="${cy}" r="${radius}" fill="#f8fafc" /><path d="${pathData}" fill="${color}" />${slices}<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#1e293b" stroke-width="1" /></svg>`;
+        function nextLevel() {
+            document.getElementById('feedback-overlay').classList.add('hidden');
+            currentLevel++;
+            loadLevel();
         }
 
-        function nextLevel() { document.getElementById('feedback-overlay').classList.add('hidden'); currentLevel++; loadLevel(); }
-        function updateScoreDisplay() { document.getElementById('score').innerText = score; }
+        function updateScoreDisplay() {
+            // 顯示當前累積的百分比分數
+            document.getElementById('score').innerText = score;
+        }
 
         function endGame() {
             clearInterval(timerInterval);
             document.getElementById('game-screen').classList.add('hidden');
-            document.getElementById('status-bar').classList.add('hidden');
             const endScreen = document.getElementById('end-screen');
-            document.getElementById('final-score').innerText = score >= 95 ? 100 : score;
-            document.getElementById('result-icon').innerText = score >= 80 ? "🏆" : score >= 60 ? "🌟" : "💪";
-            document.getElementById('result-comment').innerText = score >= 80 ? "卓越的表現！" : score >= 60 ? "很不錯喔！" : "再接再厲！";
+            const resIcon = document.getElementById('result-icon');
+            const resComment = document.getElementById('result-comment');
+            const resSub = document.getElementById('result-subtext');
+            const finalScoreEl = document.getElementById('final-score');
+            
+            // 處理最後得分 (若全對則強制補正為 100，避免捨去誤差)
+            if (score > 90 && score < 100) score = 100;
+
+            finalScoreEl.innerText = score;
             endScreen.classList.remove('hidden');
+
+            if (score >= 100) {
+                resIcon.innerText = "🏆";
+                resComment.innerText = "做得好，非常棒！";
+                resComment.className = "text-5xl font-black mb-6 text-yellow-500";
+                resSub.innerText = "你已經完全掌握了分數比較的技巧，你是真正的數學小天才！";
+            } else if (score >= 80) {
+                resIcon.innerText = "🥈";
+                resComment.innerText = "很好，十分棒！";
+                resComment.className = "text-5xl font-black mb-6 text-blue-600";
+                resSub.innerText = "你的表現非常出色，幾乎完美的完成了挑戰，繼續保持！";
+            } else if (score >= 60) {
+                resIcon.innerText = "🥉";
+                resComment.innerText = "表現不錯。";
+                resComment.className = "text-5xl font-black mb-6 text-green-600";
+                resSub.innerText = "你對分數已經有了不錯的理解，再細心一點就能拿到更高分囉。";
+            } else if (score >= 40) {
+                resIcon.innerText = "🌱";
+                resComment.innerText = "有改善空間，繼續努力。";
+                resComment.className = "text-5xl font-black mb-6 text-orange-500";
+                resSub.innerText = "基礎已經打好了，建議再多觀察圓餅圖的佔比，加油！";
+            } else {
+                resIcon.innerText = "🔍";
+                resComment.innerText = "看看自己問題所在，糾正錯處。";
+                resComment.className = "text-5xl font-black mb-6 text-slate-600";
+                resSub.innerText = "別難過，學習就是從錯誤中進步。仔細看看剛才的提示，再試一次吧！";
+            }
         }
 
         function showTeacherMode() { document.getElementById('teacher-panel').classList.remove('hidden'); }
@@ -480,16 +396,22 @@
             const newLevels = val.split('\n').filter(l => l.trim()).map(line => {
                 const fracs = line.split(',').map(s => {
                     const p = s.trim().split('/');
-                    return p.length === 2 ? { n: parseInt(p[0]), d: parseInt(p[1]) } : null;
-                }).filter(f => f);
-                return fracs.length ? { type: 'diff', fractions: fracs, isAscending: Math.random() > 0.5 } : null;
-            }).filter(l => l);
+                    if (p.length !== 2) return null;
+                    return { n: parseInt(p[0]), d: parseInt(p[1]) };
+                }).filter(f => f !== null);
+                
+                if (fracs.length === 0) return null;
+
+                let type = 'diff';
+                if (fracs.every(f => f.d === fracs[0].d)) type = 'same_den';
+                else if (fracs.every(f => f.n === fracs[0].n)) type = 'same_num';
+                return { type, fractions: fracs, isAscending: Math.random() > 0.5 };
+            }).filter(l => l !== null);
 
             if (newLevels.length) {
                 levels = newLevels;
+                startGame('preset');
                 hideTeacherMode();
-                // 自訂題目保存後，按照要求進入 QR Code 畫面
-                prepareGame('preset');
             }
         }
     </script>
