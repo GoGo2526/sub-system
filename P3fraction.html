@@ -99,8 +99,8 @@
         <!-- 遊戲畫面 -->
         <div id="game-screen" class="hidden flex-1 flex flex-col p-2 md:p-8 overflow-y-auto justify-evenly md:justify-start">
             <div class="text-center shrink-0">
-                <h3 id="main-instruction" class="text-base sm:text-xl md:text-3xl font-black text-slate-800 flex items-center justify-center whitespace-nowrap">
-                    請按<span id="sort-order-badge" class="inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full text-white font-black text-sm sm:text-base md:text-xl shadow-md mx-1 md:mx-2 align-baseline">正在載入順序...</span>排列分數。
+                <h3 id="main-instruction" class="text-xl sm:text-2xl md:text-4xl font-black text-slate-800 flex items-center justify-center whitespace-nowrap">
+                    請按<span id="sort-order-badge" class="inline-block px-3 py-1 md:px-4 md:py-2 rounded-full text-white font-black text-base sm:text-xl md:text-3xl shadow-md mx-2 md:mx-3 align-baseline">正在載入順序...</span>排列分數。
                 </h3>
             </div>
 
@@ -354,7 +354,9 @@
             isAscending = data.isAscending;
             const badge = document.getElementById('sort-order-badge');
             badge.innerText = isAscending ? "從小到大 ⬆️" : "從大到小 ⬇️";
-            badge.className = isAscending ? "inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full text-white font-black text-sm sm:text-base md:text-xl shadow-md mx-1 md:mx-2 align-baseline bg-green-500" : "inline-block px-2 py-0.5 md:px-3 md:py-1 rounded-full text-white font-black text-sm sm:text-base md:text-xl shadow-md mx-1 md:mx-2 align-baseline bg-orange-500";
+            
+            // 根據您的需求修改此處 badge 的大小樣式
+            badge.className = isAscending ? "inline-block px-3 py-1 md:px-4 md:py-2 rounded-full text-white font-black text-base sm:text-xl md:text-3xl shadow-md mx-2 md:mx-3 align-baseline bg-green-500" : "inline-block px-3 py-1 md:px-4 md:py-2 rounded-full text-white font-black text-base sm:text-xl md:text-3xl shadow-md mx-2 md:mx-3 align-baseline bg-orange-500";
             
             document.getElementById('level-text').innerText = `進度：第 ${currentLevel + 1} 題 / 共 ${levels.length} 題`;
             document.getElementById('submit-btn').disabled = true;
