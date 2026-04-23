@@ -3,426 +3,412 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>分數大挑戰 - 由淺入深版</title>
+    <title>分數大挑戰 - 移動優化版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap');
         
-        :root {
-            --primary: #4f46e5;
-            --secondary: #3b82f6;
-            --success: #10b981;
-        }
-
         body {
-            font-family: 'Noto+Sans+TC', sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at center, #f0f9ff, #e0f2fe);
             touch-action: none;
             overflow: hidden;
             height: 100vh;
             width: 100vw;
-        }
-
-        .fraction-num { border-bottom: 4px solid #1e293b; padding-bottom: 2px; }
-        
-        .drop-zone {
-            min-height: 180px;
-            width: 140px;
-            border: 4px dashed #cbd5e1;
-            border-radius: 2rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: rgba(255, 255, 255, 0.5);
         }
 
-        .drop-zone.active {
-            border-color: var(--secondary);
-            background-color: #eff6ff;
+        /* 移動端優化容器 */
+        .app-shell {
+            width: 96vw;
+            height: 94vh;
+            max-width: 1024px;
+            max-height: 800px;
+            background: white;
+            border-radius: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .fraction-line {
+            width: 100%;
+            height: 4px;
+            background-color: #1e293b;
+            margin: 4px 0;
+            border-radius: 2px;
+        }
+
+        /* 放置區樣式 */
+        .drop-target {
+            width: clamp(100px, 20vw, 150px);
+            aspect-ratio: 1/1.3;
+            border: 3px dashed #cbd5e1;
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            background: #f8fafc;
+        }
+
+        .drop-target.highlight {
+            border-color: #6366f1;
+            background: #eef2ff;
             transform: scale(1.05);
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
         }
 
-        .draggable {
-            cursor: grab;
-            touch-action: none;
+        /* 拖拽物件 */
+        .card {
+            width: clamp(90px, 18vw, 140px);
+            aspect-ratio: 1/1.3;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             user-select: none;
+            touch-action: none;
             z-index: 10;
         }
 
-        .dragging {
-            opacity: 0.6;
-            transform: scale(1.1) rotate(3deg) !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        .card.dragging {
+            opacity: 0.8;
+            transform: scale(1.15);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+            z-index: 50;
         }
 
-        @media (min-width: 768px) {
-            .game-container { height: 90vh; max-height: 800px; }
+        .btn-fancy {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
+            transition: all 0.2s active;
+        }
+
+        .btn-fancy:active {
+            transform: scale(0.95);
+            box-shadow: 0 5px 10px -5px rgba(79, 70, 229, 0.4);
         }
     </style>
 </head>
-<body class="flex items-center justify-center">
+<body>
 
-    <div id="game-app" class="game-container w-[95vw] max-w-6xl bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-200 flex flex-col relative">
+    <div class="app-shell" id="app">
         
-        <!-- 狀態列 -->
-        <div id="status-bar" class="hidden bg-slate-900 text-white p-6 md:p-8 flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <div class="bg-indigo-500 p-2 rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                </div>
+        <!-- 頂部資訊欄 -->
+        <header id="info-bar" class="hidden p-4 md:p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+                <span class="bg-indigo-500 p-2 rounded-lg text-xl">🎯</span>
                 <div>
-                    <h1 class="text-2xl font-black">分數競賽</h1>
-                    <p id="level-text" class="text-slate-400 font-bold text-sm"></p>
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-widest" id="lvl-display">Level 01</div>
+                    <div class="text-lg font-black" id="diff-label">入門挑戰</div>
                 </div>
             </div>
-            <div class="flex gap-10">
-                <div class="text-right">
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">目前得分</p>
-                    <p id="score" class="text-4xl font-black text-indigo-400">0</p>
+            <div class="flex gap-6">
+                <div class="text-center">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase">積分</div>
+                    <div class="text-2xl font-black text-indigo-400" id="score">0</div>
                 </div>
-                <div class="text-right">
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">剩餘時間</p>
-                    <p id="timer" class="text-4xl font-black text-yellow-400">--</p>
+                <div class="text-center">
+                    <div class="text-[10px] text-slate-400 font-bold uppercase">時間</div>
+                    <div class="text-2xl font-black text-yellow-400" id="timer">--</div>
                 </div>
             </div>
-        </div>
+        </header>
 
-        <!-- 1. 初始選擇畫面 -->
-        <div id="start-screen" class="flex-1 flex flex-col items-center justify-center p-12 text-center bg-slate-50">
-            <div class="mb-10">
-                <span class="text-8xl mb-6 block">📈</span>
-                <h2 class="text-5xl font-black text-slate-800 mb-4">分數大挑戰</h2>
-                <p class="text-slate-500 text-xl font-medium">題目將由淺入深，看看你能挑戰到第幾關！</p>
+        <!-- 畫面 1: 首頁 -->
+        <main id="screen-start" class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+            <div class="mb-12">
+                <div class="text-7xl mb-4 animate-bounce">🍕</div>
+                <h1 class="text-4xl font-black text-slate-800 mb-2">分數排列王</h1>
+                <p class="text-slate-500 font-medium">拖動分數，由易到難的階梯挑戰</p>
             </div>
-            
-            <div class="w-full max-w-md space-y-4">
-                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                    <label class="block text-slate-600 font-bold mb-3 text-lg">設定總題數（由易到難）</label>
-                    <input type="number" id="total-levels-input" value="10" class="w-full text-center text-3xl font-black p-4 rounded-2xl border-2 border-slate-100 focus:border-indigo-500 outline-none transition-colors">
-                </div>
-                <button onclick="prepareGame('random')" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-3xl font-black text-2xl shadow-xl transition-transform active:scale-95">開始循序漸進挑戰</button>
-                <button onclick="showTeacherMode()" class="w-full bg-white text-slate-600 py-4 rounded-3xl font-bold text-lg border border-slate-200 hover:bg-slate-50 transition-all">手動出題模式</button>
+            <div class="w-full max-w-xs space-y-4">
+                <button onclick="initGameFlow()" class="btn-fancy w-full text-white py-5 rounded-2xl font-black text-xl">開始挑戰</button>
+                <p class="text-xs text-slate-400">專為平板與手機觸控優化設計</p>
             </div>
-        </div>
+        </main>
 
-        <!-- 2. QR Code 準備畫面 -->
-        <div id="qr-screen" class="hidden flex-1 p-8 md:p-12 flex items-center justify-center bg-indigo-50">
-            <div class="w-full max-w-5xl bg-white rounded-[3.5rem] shadow-2xl p-10 flex flex-col md:flex-row items-center gap-12">
-                <div class="flex-1 flex flex-col items-center">
-                    <div id="qr-code-box" class="p-6 bg-white border-4 border-indigo-100 rounded-[2.5rem] shadow-inner mb-6"></div>
-                    <p class="text-indigo-600 font-black text-xl">掃描進入比賽</p>
-                </div>
-                <div class="flex-1 text-center md:text-left space-y-8">
-                    <div>
-                        <h3 class="text-4xl font-black text-slate-800 mb-4">準備好了嗎？</h3>
-                        <p class="text-slate-500 text-xl leading-relaxed">挑戰開始後，題目會從簡單的同分母比較逐漸變難，請保持專注！</p>
-                    </div>
-                    <button onclick="finalStart()" class="w-full bg-green-500 hover:bg-green-600 text-white py-8 rounded-[2rem] font-black text-3xl shadow-xl transition-transform active:scale-95">點擊開始比賽</button>
-                </div>
+        <!-- 畫面 2: 遊戲主體 -->
+        <main id="screen-game" class="hidden flex-1 flex flex-col p-4 md:p-8">
+            <div class="text-center mb-6">
+                <div id="order-hint" class="inline-block px-6 py-2 rounded-full text-white font-black text-sm mb-4"></div>
+                <h2 class="text-xl font-bold text-slate-700">拖動下方分數至對應空格</h2>
             </div>
-        </div>
 
-        <!-- 3. 遊戲進行畫面 -->
-        <div id="game-screen" class="hidden flex-1 flex flex-col p-6 md:p-10">
-            <div class="text-center mb-8">
-                <div id="sort-order-badge" class="inline-block px-8 py-3 rounded-2xl text-white font-black text-xl mb-4 shadow-lg"></div>
-                <h3 id="difficulty-hint" class="text-xl font-bold text-slate-400 mb-2">難度：入門</h3>
-                <h3 class="text-3xl font-black text-slate-700">拖動分數完成排列</h3>
-            </div>
-            <div id="fraction-pool" class="flex justify-center flex-wrap gap-6 mb-12 min-h-[200px] p-8 bg-slate-100/50 rounded-[3rem] border-2 border-dashed border-slate-200 items-center"></div>
-            <div id="drop-area" class="flex flex-wrap justify-center items-center gap-6 mb-10"></div>
-            <div class="mt-auto flex justify-center pb-6">
-                <button id="submit-btn" disabled onclick="checkAnswer()" class="w-full max-w-md bg-green-500 hover:bg-green-600 text-white py-6 rounded-3xl font-black text-3xl disabled:opacity-20 shadow-2xl transition-all">提交答案</button>
-            </div>
-        </div>
+            <!-- 分數卡片池 -->
+            <div id="pool" class="flex-1 bg-slate-100 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-wrap items-center justify-center gap-4 p-6 mb-6"></div>
 
-        <!-- 教師面板 -->
-        <div id="teacher-panel" class="hidden fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-6">
-            <div class="bg-white rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl">
-                <h3 class="text-3xl font-black mb-6">手動自訂題目</h3>
-                <textarea id="preset-input" class="w-full h-64 p-6 border-2 border-slate-100 rounded-3xl mb-6 font-mono text-xl focus:border-indigo-500 outline-none" placeholder="1/2, 1/3, 1/4 (每行一題)"></textarea>
-                <div class="grid grid-cols-2 gap-4">
-                    <button onclick="hideTeacherMode()" class="py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">取消</button>
-                    <button onclick="savePresets()" class="py-4 bg-indigo-600 text-white rounded-2xl font-black">確定生成</button>
-                </div>
-            </div>
-        </div>
+            <!-- 排列區 -->
+            <div id="targets" class="flex flex-wrap items-center justify-center gap-4 mb-8"></div>
 
-        <!-- 反饋彈窗 -->
-        <div id="feedback-overlay" class="hidden absolute inset-0 bg-white/95 backdrop-blur-sm z-[60] flex flex-col items-center justify-center p-8 text-center">
-            <div id="feedback-icon" class="text-9xl mb-4"></div>
-            <h3 id="feedback-title" class="text-5xl font-black mb-8"></h3>
-            <div id="logic-hint" class="bg-indigo-50 p-8 rounded-[2.5rem] text-2xl font-bold text-indigo-900 mb-10 max-w-3xl border-2 border-indigo-100 shadow-inner"></div>
-            <div id="correct-visual" class="flex gap-8 mb-12 items-center justify-center flex-wrap"></div>
-            <button onclick="nextLevel()" class="w-full max-w-lg bg-slate-900 text-white py-8 rounded-3xl font-black text-3xl shadow-2xl">下一關</button>
+            <footer class="mt-auto">
+                <button id="btn-check" disabled onclick="evaluateLevel()" class="w-full bg-emerald-500 text-white py-5 rounded-2xl font-black text-2xl shadow-xl disabled:opacity-30">驗證排列</button>
+            </footer>
+        </main>
+
+        <!-- 回饋覆蓋層 -->
+        <div id="overlay" class="hidden absolute inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center">
+            <div id="feedback-emoji" class="text-8xl mb-4"></div>
+            <h2 id="feedback-text" class="text-4xl font-black mb-6"></h2>
+            <div id="feedback-tip" class="bg-slate-100 p-6 rounded-2xl text-lg font-bold text-slate-700 mb-8 max-w-md"></div>
+            <button onclick="proceedToNext()" class="w-full max-w-xs bg-slate-900 text-white py-5 rounded-2xl font-black text-xl">下一關</button>
         </div>
 
         <!-- 結算畫面 -->
-        <div id="end-screen" class="hidden absolute inset-0 bg-indigo-600 text-white flex flex-col items-center justify-center p-12 text-center">
-            <div id="result-icon" class="text-[10rem] mb-6"></div>
-            <h2 id="result-comment" class="text-6xl font-black mb-4"></h2>
-            <div class="bg-white/10 p-10 rounded-[3rem] mb-12">
-                <p class="text-2xl font-bold opacity-80 mb-2">總得分</p>
-                <p id="final-score" class="text-9xl font-black">0</p>
-            </div>
-            <button onclick="location.reload()" class="bg-white text-indigo-600 px-16 py-6 rounded-[2rem] font-black text-3xl shadow-2xl">重新挑戰</button>
+        <div id="screen-end" class="hidden absolute inset-0 z-[60] bg-indigo-600 text-white flex flex-col items-center justify-center p-12 text-center">
+            <div class="text-9xl mb-6">🏁</div>
+            <h2 class="text-5xl font-black mb-2">挑戰結束</h2>
+            <p class="text-xl opacity-80 mb-10">你的最終積分</p>
+            <div class="text-8xl font-black mb-12" id="final-score">0</div>
+            <button onclick="location.reload()" class="bg-white text-indigo-600 px-12 py-5 rounded-2xl font-black text-xl">再次挑戰</button>
         </div>
+
     </div>
 
     <script>
-        let score = 0, currentLevel = 0, levels = [], timeLeft = 0, timerInterval, isAscending = true;
-        let draggedElement = null, touchStartX = 0, touchStartY = 0, originalX = 0, originalY = 0;
+        let gameState = {
+            score: 0,
+            level: 0,
+            timer: 0,
+            totalLevels: 10,
+            levelsData: [],
+            isAscending: true,
+            draggedEl: null,
+            touchOffset: { x: 0, y: 0 }
+        };
 
-        function generateQRCode() {
-            const qrBox = document.getElementById('qr-code-box');
-            const url = window.location.href;
-            qrBox.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}" class="w-64 h-64 md:w-80 md:h-80" alt="QR Code">`;
-        }
+        const config = {
+            difficulties: ['入門', '進階', '專家', '大師'],
+            colors: { asc: '#10b981', desc: '#f59e0b' }
+        };
 
-        function prepareGame(mode) {
-            if (mode === 'random') {
-                const count = parseInt(document.getElementById('total-levels-input').value) || 10;
-                levels = generateProgressiveLevels(count);
+        // --- 初始化由淺入深的題目 ---
+        function generateLevels() {
+            let data = [];
+            for(let i=0; i<gameState.totalLevels; i++) {
+                let type, count, diff;
+                let ratio = i / gameState.totalLevels;
+                
+                if(ratio < 0.3) { type = 'same_d'; count = 2; diff = '入門'; }
+                else if(ratio < 0.6) { type = 'same_n'; count = 3; diff = '進階'; }
+                else { type = 'mixed'; count = 3; diff = '專家挑戰'; }
+
+                let fracs = [];
+                if(type === 'same_d') {
+                    const d = 5 + Math.floor(Math.random()*5);
+                    let nums = new Set();
+                    while(nums.size < count) nums.add(1 + Math.floor(Math.random()*(d-1)));
+                    fracs = Array.from(nums).map(n => ({n, d}));
+                } else if(type === 'same_n') {
+                    const n = 1 + Math.floor(Math.random()*3);
+                    let dens = new Set();
+                    while(dens.size < count) dens.add(5 + Math.floor(Math.random()*10));
+                    fracs = Array.from(dens).map(d => ({n, d}));
+                } else {
+                    while(fracs.length < count) {
+                        const d = 2 + Math.floor(Math.random()*10), n = 1 + Math.floor(Math.random()*(d-1));
+                        if(!fracs.some(f => f.n/f.d === n/d)) fracs.push({n, d});
+                    }
+                }
+                data.push({ fracs, diff, isAsc: Math.random() > 0.5 });
             }
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('qr-screen').classList.remove('hidden');
-            generateQRCode();
+            return data;
         }
 
-        function finalStart() {
-            document.getElementById('qr-screen').classList.add('hidden');
-            document.getElementById('status-bar').classList.remove('hidden');
-            document.getElementById('game-screen').classList.remove('hidden');
-            score = 0; currentLevel = 0;
-            loadLevel();
+        function initGameFlow() {
+            gameState.levelsData = generateLevels();
+            document.getElementById('screen-start').classList.add('hidden');
+            document.getElementById('info-bar').classList.remove('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+            renderLevel();
             startTimer();
         }
 
-        // --- 核心更新：由淺入深的邏輯 ---
-        function generateProgressiveLevels(count) {
-            let result = [];
-            for (let i = 0; i < count; i++) {
-                const progress = i / count;
-                let type, nSize, diffLevel;
+        function renderLevel() {
+            const data = gameState.levelsData[gameState.level];
+            gameState.isAscending = data.isAsc;
 
-                if (progress < 0.3) {
-                    // 入門：同分母比較，2個方塊
-                    type = 'same_den';
-                    nSize = 2;
-                    diffLevel = '入門';
-                } else if (progress < 0.6) {
-                    // 進階：同分子比較，2-3個方塊
-                    type = 'same_num';
-                    nSize = (progress < 0.45) ? 2 : 3;
-                    diffLevel = '進階';
-                } else {
-                    // 挑戰：異分母比較，3個方塊以上
-                    type = 'diff';
-                    nSize = (progress < 0.8) ? 3 : 4;
-                    diffLevel = '挑戰';
-                }
-
-                let fracs = [];
-                if (type === 'same_den') {
-                    const d = Math.floor(Math.random() * 6) + 4;
-                    const nums = new Set();
-                    while(nums.size < nSize) nums.add(Math.floor(Math.random() * (d-1)) + 1);
-                    fracs = Array.from(nums).map(n => ({ n, d }));
-                } else if (type === 'same_num') {
-                    const n = Math.floor(Math.random() * 3) + 1;
-                    const dens = new Set();
-                    while(dens.size < nSize) dens.add(Math.floor(Math.random() * 8) + 4);
-                    fracs = Array.from(dens).map(d => ({ n, d }));
-                } else {
-                    while(fracs.length < nSize) {
-                        const d = Math.floor(Math.random() * 11) + 2, n = Math.floor(Math.random() * (d-1)) + 1;
-                        if (!fracs.some(f => f.n/f.d === n/d)) fracs.push({n, d});
-                    }
-                }
-                result.push({ type, fractions: fracs, isAscending: Math.random() > 0.5, diffLevel });
-            }
-            return result;
-        }
-
-        function startTimer() {
-            timeLeft = 60 + (levels.length * 10);
-            document.getElementById('timer').innerText = timeLeft;
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft;
-                if (timeLeft <= 0) endGame();
-            }, 1000);
-        }
-
-        function loadLevel() {
-            if (currentLevel >= levels.length) return endGame();
-            const data = levels[currentLevel];
-            isAscending = data.isAscending;
+            // 更新介面
+            document.getElementById('lvl-display').innerText = `Level ${String(gameState.level + 1).padStart(2, '0')}`;
+            document.getElementById('diff-label').innerText = data.diff;
             
-            document.getElementById('difficulty-hint').innerText = `難度：${data.diffLevel}`;
-            const badge = document.getElementById('sort-order-badge');
-            badge.innerText = isAscending ? "從小到大排列 ⬆️" : "從大到小排列 ⬇️";
-            badge.style.backgroundColor = isAscending ? '#10b981' : '#f59e0b';
-            
-            document.getElementById('level-text').innerText = `進度：${currentLevel + 1} / ${levels.length}`;
-            document.getElementById('submit-btn').disabled = true;
+            const hint = document.getElementById('order-hint');
+            hint.innerText = data.isAsc ? "由小到大排列 ↗️" : "由大到小排列 ↘️";
+            hint.style.backgroundColor = data.isAsc ? config.colors.asc : config.colors.desc;
 
-            const pool = document.getElementById('fraction-pool');
-            pool.innerHTML = '';
-            [...data.fractions].sort(() => Math.random() - 0.5).forEach((f, i) => {
-                const el = document.createElement('div');
-                el.className = "draggable bg-white border-4 border-slate-200 p-8 rounded-[2rem] shadow-xl flex flex-col items-center min-w-[120px]";
-                el.dataset.n = f.n; el.dataset.d = f.d; el.dataset.val = f.n/f.d;
-                el.innerHTML = `<div class="fraction-num text-4xl font-black">${f.n}</div><div class="text-4xl font-black pt-1">${f.d}</div>`;
-                el.addEventListener('touchstart', onTouchStart, {passive: false});
-                el.addEventListener('touchmove', onTouchMove, {passive: false});
-                el.addEventListener('touchend', onTouchEnd, {passive: false});
-                pool.appendChild(el);
-            });
+            // 清理區域
+            const pool = document.getElementById('pool');
+            const targets = document.getElementById('targets');
+            pool.innerHTML = ''; targets.innerHTML = '';
+            document.getElementById('btn-check').disabled = true;
 
-            const dropArea = document.getElementById('drop-area');
-            dropArea.innerHTML = '';
-            data.fractions.forEach((_, i) => {
+            // 建立方塊
+            [...data.fracs].sort(() => Math.random() - 0.5).forEach((f, idx) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.dataset.val = f.n / f.d;
+                card.dataset.n = f.n; card.dataset.d = f.d;
+                card.innerHTML = `<span class="text-2xl font-black">${f.n}</span><div class="fraction-line"></div><span class="text-2xl font-black">${f.d}</span>`;
+                
+                // 觸控事件綁定
+                card.addEventListener('touchstart', onTouchStart, {passive: false});
+                card.addEventListener('touchmove', onTouchMove, {passive: false});
+                card.addEventListener('touchend', onTouchEnd);
+                pool.appendChild(card);
+
+                // 建立目標區
                 const zone = document.createElement('div');
-                zone.className = "drop-zone";
-                dropArea.appendChild(zone);
-                if (i < data.fractions.length - 1) {
-                    const sym = document.createElement('div');
-                    sym.className = "text-5xl font-black text-slate-200";
-                    sym.innerHTML = isAscending ? " < " : " > ";
-                    dropArea.appendChild(sym);
+                zone.className = 'drop-target';
+                targets.appendChild(zone);
+                if(idx < data.fracs.length - 1) {
+                    const icon = document.createElement('div');
+                    icon.className = "text-2xl font-black text-slate-300 mx-1";
+                    icon.innerText = data.isAsc ? "<" : ">";
+                    targets.appendChild(icon);
                 }
             });
         }
 
+        // --- 觸控邏輯引擎 ---
         function onTouchStart(e) {
             e.preventDefault();
-            draggedElement = e.currentTarget;
             const touch = e.touches[0];
-            const rect = draggedElement.getBoundingClientRect();
-            touchStartX = touch.clientX; touchStartY = touch.clientY;
-            originalX = rect.left; originalY = rect.top;
-            draggedElement.classList.add('dragging');
-            draggedElement.style.position = 'fixed';
-            draggedElement.style.width = rect.width + 'px';
-            draggedElement.style.left = originalX + 'px';
-            draggedElement.style.top = originalY + 'px';
+            gameState.draggedEl = e.currentTarget;
+            const rect = gameState.draggedEl.getBoundingClientRect();
+            
+            gameState.touchOffset = {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
+            };
+
+            gameState.draggedEl.classList.add('dragging');
+            gameState.draggedEl.style.position = 'fixed';
+            gameState.draggedEl.style.width = rect.width + 'px';
+            updateDragPos(touch.clientX, touch.clientY);
         }
 
         function onTouchMove(e) {
-            if (!draggedElement) return;
+            if(!gameState.draggedEl) return;
             const touch = e.touches[0];
-            draggedElement.style.left = (originalX + (touch.clientX - touchStartX)) + 'px';
-            draggedElement.style.top = (originalY + (touch.clientY - touchStartY)) + 'px';
-            document.querySelectorAll('.drop-zone').forEach(zone => {
+            updateDragPos(touch.clientX, touch.clientY);
+
+            // 偵測目標碰撞
+            document.querySelectorAll('.drop-target').forEach(zone => {
                 const r = zone.getBoundingClientRect();
-                if (touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) zone.classList.add('active');
-                else zone.classList.remove('active');
+                if(touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) {
+                    zone.classList.add('highlight');
+                } else {
+                    zone.classList.remove('highlight');
+                }
             });
         }
 
         function onTouchEnd(e) {
-            if (!draggedElement) return;
+            if(!gameState.draggedEl) return;
             const touch = e.changedTouches[0];
-            draggedElement.classList.remove('dragging');
-            draggedElement.style.position = ''; draggedElement.style.left = ''; draggedElement.style.top = ''; draggedElement.style.width = '';
+            const el = gameState.draggedEl;
+            gameState.draggedEl = null;
+            el.classList.remove('dragging');
+            el.style.position = ''; el.style.left = ''; el.style.top = ''; el.style.width = '';
+
             let dropped = false;
-            document.querySelectorAll('.drop-zone').forEach(zone => {
+            document.querySelectorAll('.drop-target').forEach(zone => {
                 const r = zone.getBoundingClientRect();
-                if (touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) {
-                    if (zone.firstChild) document.getElementById('fraction-pool').appendChild(zone.firstChild);
-                    zone.appendChild(draggedElement);
+                if(touch.clientX > r.left && touch.clientX < r.right && touch.clientY > r.top && touch.clientY < r.bottom) {
+                    if(zone.firstChild) document.getElementById('pool').appendChild(zone.firstChild);
+                    zone.appendChild(el);
                     dropped = true;
                 }
-                zone.classList.remove('active');
+                zone.classList.remove('highlight');
             });
-            if (!dropped) document.getElementById('fraction-pool').appendChild(draggedElement);
-            draggedElement = null;
-            document.getElementById('submit-btn').disabled = !Array.from(document.querySelectorAll('.drop-zone')).every(z => z.firstChild);
+
+            if(!dropped) document.getElementById('pool').appendChild(el);
+            
+            // 檢查是否所有坑都填滿
+            const allFilled = Array.from(document.querySelectorAll('.drop-target')).every(z => z.firstChild);
+            document.getElementById('btn-check').disabled = !allFilled;
         }
 
-        function checkAnswer() {
-            const zones = document.querySelectorAll('.drop-zone');
-            const user = Array.from(zones).map(z => ({ n: parseInt(z.firstChild.dataset.n), d: parseInt(z.firstChild.dataset.d), val: parseFloat(z.firstChild.dataset.val) }));
-            const correct = [...user].sort((a,b) => isAscending ? a.val - b.val : b.val - a.val);
-            const isCorrect = user.every((f, i) => Math.abs(f.val - correct[i].val) < 0.001);
-            const data = levels[currentLevel];
-            let hint = data.type === 'same_den' ? "💡 入門技巧：分母相同時，分子越大代表佔的分數越多。" : data.type === 'same_num' ? "💡 進階技巧：分子相同時，分母越大代表切得越細，所以分數反而越小。" : "💡 挑戰技巧：不同分數時，仔細觀察圓餅圖的佔比面積。";
-            showFeedback(isCorrect, correct, hint);
+        function updateDragPos(x, y) {
+            gameState.draggedEl.style.left = `${x - gameState.touchOffset.x}px`;
+            gameState.draggedEl.style.top = `${y - gameState.touchOffset.y}px`;
         }
 
-        function showFeedback(isCorrect, correct, hint) {
-            const overlay = document.getElementById('feedback-overlay');
-            const icon = document.getElementById('feedback-icon');
-            const title = document.getElementById('feedback-title');
-            const visual = document.getElementById('correct-visual');
-            visual.innerHTML = '';
-            correct.forEach((f, i) => {
-                const item = document.createElement('div');
-                item.className = "flex flex-col items-center gap-4 bg-white p-6 rounded-3xl border shadow-sm";
-                item.innerHTML = `${drawPie(f.n, f.d, 120, isCorrect ? '#10b981' : '#4f46e5')}<div class="text-3xl font-black border-t-4 border-slate-900 px-4">${f.n}<br>${f.d}</div>`;
-                visual.appendChild(item);
-                if (i < correct.length - 1) visual.innerHTML += `<div class="text-4xl font-black text-slate-300">${isAscending ? '<' : '>'}</div>`;
-            });
-            if (isCorrect) {
-                score += Math.floor(100 / levels.length);
-                icon.innerText = "🌟"; title.innerText = "完美過關！";
-                title.className = "text-5xl font-black text-green-500 mb-8";
-            } else {
-                icon.innerText = "💡"; title.innerText = "學習時間！";
-                title.className = "text-5xl font-black text-orange-500 mb-8";
+        // --- 遊戲邏輯 ---
+        function evaluateLevel() {
+            const zones = document.querySelectorAll('.drop-target');
+            const userValues = Array.from(zones).map(z => parseFloat(z.firstChild.dataset.val));
+            
+            let isCorrect = true;
+            for(let i=0; i<userValues.length-1; i++) {
+                if(gameState.isAscending) {
+                    if(userValues[i] > userValues[i+1]) isCorrect = false;
+                } else {
+                    if(userValues[i] < userValues[i+1]) isCorrect = false;
+                }
             }
-            document.getElementById('logic-hint').innerText = hint;
-            document.getElementById('score').innerText = score;
+
+            showFeedback(isCorrect);
+        }
+
+        function showFeedback(isCorrect) {
+            const overlay = document.getElementById('overlay');
+            const emoji = document.getElementById('feedback-emoji');
+            const title = document.getElementById('feedback-text');
+            const tip = document.getElementById('feedback-tip');
+
+            if(isCorrect) {
+                gameState.score += 10;
+                emoji.innerText = "🌟";
+                title.innerText = "太棒了！";
+                title.className = "text-4xl font-black text-emerald-500 mb-6";
+                tip.innerText = "你的邏輯非常清晰，完全正確！";
+            } else {
+                emoji.innerText = "💡";
+                title.innerText = "差一點點";
+                title.className = "text-4xl font-black text-orange-500 mb-6";
+                tip.innerText = "提示：可以想像圓餅圖的大小。分母越大代表切得越細喔！";
+            }
+            
+            document.getElementById('score').innerText = gameState.score;
             overlay.classList.remove('hidden');
         }
 
-        function drawPie(n, d, size, color) {
-            const r = 16, c = 16, p = n / d;
-            const endX = c + r * Math.sin(2 * Math.PI * p), endY = c - r * Math.cos(2 * Math.PI * p);
-            const path = p === 1 ? `M ${c} ${c-r} A ${r} ${r} 0 1 1 ${c-0.1} ${c-r} Z` : `M ${c} ${c} L ${c} ${c-r} A ${r} ${r} 0 ${p > 0.5 ? 1 : 0} 1 ${endX} ${endY} Z`;
-            let grid = '';
-            for(let i=0; i<d; i++) {
-                const a = 2*Math.PI*i/d;
-                grid += `<line x1="${c}" y1="${c}" x2="${c+r*Math.sin(a)}" y2="${c-r*Math.cos(a)}" stroke="#ddd" stroke-width="0.5"/>`;
+        function proceedToNext() {
+            document.getElementById('overlay').classList.add('hidden');
+            gameState.level++;
+            if(gameState.level >= gameState.totalLevels) {
+                endGame();
+            } else {
+                renderLevel();
             }
-            return `<svg width="${size}" height="${size}" viewBox="0 0 32 32"><circle cx="${c}" cy="${c}" r="${r}" fill="#f1f5f9"/><path d="${path}" fill="${color}" stroke="#1e293b" stroke-width="1"/>${grid}</svg>`;
         }
 
-        function nextLevel() {
-            document.getElementById('feedback-overlay').classList.add('hidden');
-            currentLevel++;
-            loadLevel();
+        function startTimer() {
+            gameState.timer = 120;
+            const timerEl = document.getElementById('timer');
+            const interval = setInterval(() => {
+                gameState.timer--;
+                timerEl.innerText = gameState.timer;
+                if(gameState.timer <= 0) {
+                    clearInterval(interval);
+                    endGame();
+                }
+            }, 1000);
         }
 
         function endGame() {
-            clearInterval(timerInterval);
-            const screen = document.getElementById('end-screen');
-            document.getElementById('final-score').innerText = Math.min(score, 100);
-            document.getElementById('result-icon').innerText = score >= 80 ? "🏆" : score >= 50 ? "🥈" : "💪";
-            document.getElementById('result-comment').innerText = score >= 80 ? "你真是分數專家！" : "很不錯的挑戰！";
-            screen.classList.remove('hidden');
-        }
-
-        function showTeacherMode() { document.getElementById('teacher-panel').classList.remove('hidden'); }
-        function hideTeacherMode() { document.getElementById('teacher-panel').classList.add('hidden'); }
-        function savePresets() {
-            const input = document.getElementById('preset-input').value.trim();
-            if(!input) return;
-            levels = input.split('\n').map(line => {
-                const fs = line.split(',').map(s => {
-                    const [n, d] = s.trim().split('/').map(Number);
-                    return n && d ? {n, d} : null;
-                }).filter(f => f);
-                return fs.length ? {type: 'diff', fractions: fs, isAscending: Math.random() > 0.5, diffLevel: '手動出題'} : null;
-            }).filter(l => l);
-            hideTeacherMode();
-            prepareGame('custom');
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-end').classList.remove('hidden');
+            document.getElementById('final-score').innerText = gameState.score;
         }
     </script>
 </body>
