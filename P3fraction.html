@@ -123,20 +123,22 @@
         </div>
 
         <!-- 反饋彈窗 -->
-        <div id="feedback-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-[3rem] p-10 max-w-4xl w-full shadow-2xl border-4 border-white">
-                <div class="text-center mb-8">
-                    <div id="feedback-icon" class="text-8xl mb-4"></div>
-                    <h3 id="feedback-title" class="text-4xl font-black mb-6"></h3>
-                    <div id="logic-hint" class="block w-full p-8 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-[2rem] text-2xl font-black leading-snug shadow-inner"></div>
-                </div>
+        <div id="feedback-overlay" class="hidden fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 overflow-y-auto">
+            <div class="min-h-screen flex items-center justify-center p-4">
+                <div class="bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 max-w-4xl w-full shadow-2xl border-4 border-white">
+                    <div class="text-center mb-8">
+                        <div id="feedback-icon" class="text-7xl md:text-8xl mb-4"></div>
+                        <h3 id="feedback-title" class="text-3xl md:text-4xl font-black mb-6"></h3>
+                        <div id="logic-hint" class="block w-full p-6 md:p-8 bg-blue-50 border-2 border-blue-100 text-blue-900 rounded-[2rem] text-xl md:text-2xl font-black leading-snug shadow-inner"></div>
+                    </div>
 
-                <div class="p-8 bg-slate-100 rounded-[2rem] border border-slate-200 mb-8">
-                    <p id="visual-label" class="text-center font-black text-slate-500 mb-6 uppercase tracking-widest text-sm">正確的分數排列與圖像</p>
-                    <div id="correct-visual" class="flex justify-center flex-wrap gap-8"></div>
-                </div>
+                    <div class="p-6 md:p-8 bg-slate-100 rounded-[2rem] border border-slate-200 mb-8">
+                        <p id="visual-label" class="text-center font-black text-slate-500 mb-6 uppercase tracking-widest text-sm">正確的分數排列與圖像</p>
+                        <div id="correct-visual" class="flex flex-nowrap overflow-x-auto w-full justify-start md:justify-center items-center gap-4 md:gap-8 pb-4 px-2"></div>
+                    </div>
 
-                <button onclick="nextLevel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-2xl font-black text-2xl shadow-xl transition-all">繼續挑戰下一題</button>
+                    <button onclick="nextLevel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 rounded-2xl font-black text-2xl shadow-xl transition-all">繼續挑戰下一題</button>
+                </div>
             </div>
         </div>
 
@@ -214,15 +216,22 @@
 
             document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('active'));
 
+            const sourceParent = draggedElement.parentNode;
+
             if (dropZone) {
-                if (dropZone.hasChildNodes()) {
-                    document.getElementById('fraction-pool').appendChild(dropZone.firstChild);
+                if (dropZone !== sourceParent) {
+                    if (dropZone.hasChildNodes()) {
+                        const existingElement = dropZone.firstChild;
+                        if (sourceParent && sourceParent.classList.contains('drop-zone')) {
+                            sourceParent.appendChild(existingElement);
+                        } else {
+                            document.getElementById('fraction-pool').appendChild(existingElement);
+                        }
+                    }
+                    dropZone.appendChild(draggedElement);
                 }
-                dropZone.appendChild(draggedElement);
             } else {
-                if (!draggedElement.closest('.drop-zone')) {
-                    document.getElementById('fraction-pool').appendChild(draggedElement);
-                }
+                document.getElementById('fraction-pool').appendChild(draggedElement);
             }
             document.getElementById('submit-btn').disabled = !Array.from(document.querySelectorAll('.drop-zone')).every(z => z.hasChildNodes());
             draggedElement = null;
@@ -332,6 +341,15 @@
             document.getElementById('submit-btn').disabled = true;
             const pool = document.getElementById('fraction-pool');
             pool.innerHTML = '';
+            
+            // 允許從答案區拉回題庫區 (桌機版)
+            pool.addEventListener('dragover', e => e.preventDefault());
+            pool.addEventListener('drop', e => {
+                e.preventDefault();
+                pool.appendChild(draggedElement);
+                document.getElementById('submit-btn').disabled = !Array.from(document.querySelectorAll('.drop-zone')).every(z => z.hasChildNodes());
+            });
+
             [...data.fractions].sort(() => Math.random() - 0.5).forEach((f, idx) => {
                 const card = document.createElement('div');
                 card.className = "fraction-container bg-white border-4 border-slate-200 p-4 md:p-6 rounded-[1.5rem] shadow-sm draggable hover:border-indigo-400 shrink-0";
@@ -363,8 +381,18 @@
                 zone.addEventListener('drop', e => {
                     e.preventDefault();
                     zone.classList.remove('active');
-                    if (zone.hasChildNodes()) pool.appendChild(zone.firstChild);
-                    zone.appendChild(draggedElement);
+                    const sourceParent = draggedElement.parentNode;
+                    if (zone !== sourceParent) {
+                        if (zone.hasChildNodes()) {
+                            const existingElement = zone.firstChild;
+                            if (sourceParent && sourceParent.classList.contains('drop-zone')) {
+                                sourceParent.appendChild(existingElement);
+                            } else {
+                                pool.appendChild(existingElement);
+                            }
+                        }
+                        zone.appendChild(draggedElement);
+                    }
                     document.getElementById('submit-btn').disabled = !Array.from(document.querySelectorAll('.drop-zone')).every(z => z.hasChildNodes());
                 });
                 dropArea.appendChild(zone);
@@ -403,12 +431,12 @@
             correctVisual.innerHTML = '';
             correctF.forEach((f, i) => {
                 const wrap = document.createElement('div');
-                wrap.className = "flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100";
+                wrap.className = "flex flex-col items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 shrink-0 min-w-[120px]";
                 wrap.innerHTML = `${createFractionPie(f.n, f.d, 110, isCorrect ? '#10b981' : '#4f46e5')}<div class="flex flex-col items-center"><div class="text-2xl font-black border-b-2 border-slate-800 px-2">${f.n}</div><div class="text-2xl font-black px-2">${f.d}</div></div>`;
                 correctVisual.appendChild(wrap);
                 if(i < correctF.length - 1) {
                     const arrow = document.createElement('div');
-                    arrow.className = "flex items-center text-3xl font-black text-slate-300";
+                    arrow.className = "flex items-center text-3xl font-black text-slate-300 shrink-0";
                     arrow.innerHTML = isAscending ? "&lt;" : "&gt;";
                     correctVisual.appendChild(arrow);
                 }
