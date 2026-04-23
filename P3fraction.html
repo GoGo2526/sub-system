@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>分數大挑戰 - 專業教學版</title>
+    <title>三年級數學-分數的比較 - 專業教學版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -45,6 +45,15 @@
             50% { transform: translateY(-20px); }
         }
         .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+
+        /* 隱藏原生卷軸但保留滑動功能 */
+        .hide-scrollbar::-webkit-scrollbar {
+            height: 6px;
+        }
+        .hide-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body class="p-0 md:p-8 bg-slate-100 h-[100dvh] md:h-auto md:min-h-screen overflow-hidden md:overflow-auto">
@@ -52,17 +61,17 @@
         <!-- 頂部狀態列 -->
         <div class="bg-gradient-to-r from-indigo-600 to-blue-700 text-white p-6 flex justify-between items-center shrink-0">
             <div>
-                <h1 class="text-2xl font-black tracking-tight">分數大挑戰</h1>
+                <h1 class="text-xl md:text-2xl font-black tracking-tight">三年級數學-分數的比較</h1>
                 <p id="level-text" class="text-blue-100 text-sm font-bold mt-1">載入中...</p>
             </div>
-            <div class="flex gap-8">
+            <div class="flex gap-4 md:gap-8">
                 <div class="text-center">
                     <p class="text-[10px] uppercase font-bold opacity-70">目前得分</p>
-                    <p id="score" class="text-4xl font-black">0</p>
+                    <p id="score" class="text-3xl md:text-4xl font-black">0</p>
                 </div>
                 <div class="text-center">
                     <p class="text-[10px] uppercase font-bold opacity-70">倒數</p>
-                    <p id="timer" class="text-4xl font-black text-yellow-300">60</p>
+                    <p id="timer" class="text-3xl md:text-4xl font-black text-yellow-300">60</p>
                 </div>
             </div>
         </div>
@@ -96,9 +105,12 @@
                 <h3 id="main-instruction" class="text-2xl md:text-3xl font-black text-slate-800">請按順序排列分數</h3>
             </div>
 
-            <div id="fraction-pool" class="flex justify-center items-center flex-wrap gap-3 md:gap-6 mb-6 md:mb-16 min-h-[100px] md:min-h-[140px] p-4 md:p-8 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] border-2 border-dashed border-slate-200 shrink-0"></div>
+            <div id="fraction-pool" class="flex justify-center items-center flex-wrap gap-3 md:gap-6 mb-6 md:mb-10 min-h-[100px] md:min-h-[140px] p-4 md:p-8 bg-slate-50 rounded-[1.5rem] md:rounded-[2rem] border-2 border-dashed border-slate-200 shrink-0"></div>
 
-            <div id="drop-area" class="flex flex-nowrap w-full justify-center items-center gap-1 md:gap-4 mb-6 md:mb-12 shrink-0"></div>
+            <!-- 可滑動的答題排列區 -->
+            <div class="w-full overflow-x-auto hide-scrollbar pb-6 mb-4 md:mb-8 shrink-0">
+                <div id="drop-area" class="flex flex-nowrap min-w-full w-max justify-center items-center gap-1 md:gap-4 px-2 md:px-4 mx-auto shrink-0"></div>
+            </div>
 
             <div class="flex justify-center mt-auto pb-4 shrink-0">
                 <button id="submit-btn" disabled onclick="checkAnswer()" class="bg-green-600 hover:bg-green-700 text-white px-16 py-4 md:py-5 rounded-2xl font-black text-2xl disabled:opacity-20 transition-all shadow-xl">提交答案</button>
@@ -111,8 +123,8 @@
                 <h3 class="text-2xl font-black">教師題目自訂</h3>
                 <button onclick="hideTeacherMode()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✖</button>
             </div>
-            <p class="text-slate-500 mb-4 font-bold italic">規則：每行一題，分數用逗號隔開（如 1/2, 2/3）。系統會自動決定排列順序。</p>
-            <textarea id="preset-input" class="w-full h-48 p-6 border-2 rounded-2xl mb-6 font-mono text-lg focus:ring-4 focus:ring-indigo-100 outline-none" placeholder="1/2, 1/3, 1/4&#10;2/5, 4/5&#10;3/7, 3/8, 3/10"></textarea>
+            <p class="text-slate-500 mb-4 font-bold italic">規則：每行一題，分數用逗號隔開（如 1/2, 2/3, 3/4, 4/5）。系統會自動決定排列順序。</p>
+            <textarea id="preset-input" class="w-full h-48 p-6 border-2 rounded-2xl mb-6 font-mono text-lg focus:ring-4 focus:ring-indigo-100 outline-none" placeholder="1/2, 1/3, 1/4&#10;2/5, 4/5&#10;3/7, 3/8, 3/10&#10;1/2, 2/3, 3/4, 4/5"></textarea>
             
             <div class="flex flex-col md:flex-row items-center gap-4 mb-6">
                 <label class="font-bold text-slate-700 whitespace-nowrap">比賽題數：</label>
@@ -138,7 +150,10 @@
 
                     <div class="p-4 md:p-8 bg-slate-100 rounded-[1.5rem] md:rounded-[2rem] border border-slate-200 mb-6 md:mb-8">
                         <p id="visual-label" class="text-center font-black text-slate-500 mb-4 md:mb-6 uppercase tracking-widest text-xs md:text-sm">正確的分數排列與圖像</p>
-                        <div id="correct-visual" class="flex flex-nowrap w-full justify-center items-center gap-2 md:gap-8 pb-2"></div>
+                        <!-- 可滑動的解答區 -->
+                        <div class="w-full overflow-x-auto hide-scrollbar pb-4">
+                            <div id="correct-visual" class="flex flex-nowrap min-w-full w-max justify-center items-center gap-2 md:gap-8 px-2 mx-auto"></div>
+                        </div>
                     </div>
 
                     <button onclick="nextLevel()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-5 md:py-6 rounded-xl md:rounded-2xl font-black text-xl md:text-2xl shadow-xl transition-all">繼續挑戰下一題</button>
