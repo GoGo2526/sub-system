@@ -184,7 +184,7 @@
       ],
     };
 
-        const SCHEDULE_STRUCTURE = [
+         const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:30', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:30 - 8:55', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '8:55 - 9:20', csvKey: '2' },
@@ -200,6 +200,7 @@
       { type: 'class', id: '8', label: '第八節', time: '11:55 - 12:20', csvKey: '8' },
       { type: 'class', id: '9', label: '第九節', time: '12:20 - 12:30', csvKey: '9' },
     ];
+
 
     const DAYS_CONFIG = [
       { id: 'mon', label: '一', offset: 1 },
@@ -351,6 +352,37 @@
         });
         return cache;
       }, [rawData]);
+
+      // 快取 3: 記錄每位老師有任教的班別集合 (Set)，用於判斷代課/缺課老師是否教同一班
+      const teacherClassesCache = useMemo(() => {
+        const cache = {};
+        teachers.forEach(t => cache[t] = new Set());
+
+        DAYS_CONFIG.forEach(day => {
+          const dayData = rawData[day.id] || rawData.mon;
+          const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
+          if (!headerRow) return;
+
+          headerRow.forEach((teacher, idx) => {
+            if (idx === 0 || !teacher || teacher.trim() === "") return;
+            if (!cache[teacher]) cache[teacher] = new Set();
+            
+            SCHEDULE_STRUCTURE.forEach(slot => {
+              if (slot.type === 'break') return;
+              const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
+              if (dataRow) {
+                const content = dataRow[idx];
+                if (content && content.includes('/')) {
+                  cache[teacher].add(content.split('/')[0].trim());
+                } else if (content && (slot.id === 'HR' || slot.id === 'LUNCH' || slot.id === 'REST')) {
+                  cache[teacher].add(content.trim());
+                }
+              }
+            });
+          });
+        });
+        return cache;
+      }, [rawData, teachers]);
 
       const getTeacherSchedule = (teacherName, dayId) => {
         return schedulesMetaCache[dayId]?.[teacherName]?.schedule || Array(SCHEDULE_STRUCTURE.length).fill("");
@@ -1254,11 +1286,13 @@
         }
 
         const results = {};
+        const subTeacherClasses = teacherClassesCache[swapOriginalTeacher] || new Set();
+
         DAYS_CONFIG.forEach(day => {
           const origMeta = schedulesMetaCache[day.id]?.[swapOriginalTeacher];
           const subMeta = schedulesMetaCache[day.id]?.[swapSubTeacher];
           if (!origMeta || !subMeta) {
-            results[day.id] = "--";
+            results[day.id] = null;
             return;
           }
           const matchedSlots = [];
@@ -1300,7 +1334,13 @@
                 }
               }
               
-              matchedSlots.push(`${slot.label}(${displayStr})`);
+              // 檢查代課老師是否也有教這個班別
+              const isSharedClass = classCode && subTeacherClasses.has(classCode.trim());
+              
+              matchedSlots.push({
+                text: `${slot.label}(${displayStr})`,
+                isShared: isSharedClass
+              });
             }
           });
           results[day.id] = matchedSlots.length > 0 ? matchedSlots : null;
@@ -1593,17 +1633,23 @@
                               </div>
                               
                               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                                {getAvailableTeachers(activeTab, idx).map((sub, sIdx) => (
-                                  <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className="bg-white p-6 rounded-2xl border-2 border-orange-300 hover:border-[#800000] hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        {sub.prevStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="前兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.prevStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.prevStatus === 'R' ? '前一節有課' : '後一節無課'}></div>}
-                                        <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)}`}>{sub.id}</span>
-                                        {sub.nextStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="後兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.nextStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.nextStatus === 'R' ? '後一節有課' : '後一節無課'}></div>}
-                                    </div>
-                                    <span className="text-lg font-black text-slate-400 uppercase leading-none">總節數</span>
-                                    <span className="text-3xl font-black text-slate-700">{sub.total}節</span>
-                                  </button>
-                                ))}
+                                {getAvailableTeachers(activeTab, idx).map((sub, sIdx) => {
+                                  const subTeacherClasses = teacherClassesCache[sub.id] || new Set();
+                                  const isSharedClass = classCode && subTeacherClasses.has(classCode.trim());
+                                  const cardBgClass = isSharedClass ? 'bg-[#d1fae5] border-[#34d399] hover:border-[#059669]' : 'bg-white border-orange-300 hover:border-[#800000]';
+
+                                  return (
+                                    <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className={`${cardBgClass} p-6 rounded-2xl border-2 hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden`}>
+                                      <div className="flex items-center gap-2 mb-3">
+                                          {sub.prevStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="前兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.prevStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.prevStatus === 'R' ? '前一節有課' : '後一節無課'}></div>}
+                                          <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)}`}>{sub.id}</span>
+                                          {sub.nextStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="後兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.nextStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.nextStatus === 'R' ? '後一節有課' : '後一節無課'}></div>}
+                                      </div>
+                                      <span className="text-lg font-black text-slate-400 uppercase leading-none">總節數</span>
+                                      <span className="text-3xl font-black text-slate-700">{sub.total}節</span>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1952,9 +1998,9 @@
                             <div key={day.id} className="flex gap-4 md:gap-8 items-start">
                               <div className="text-blue-800 font-black min-w-[60px] md:min-w-[80px]">星期{day.label}</div>
                               <div className="text-slate-700 flex flex-wrap gap-x-2 gap-y-1 flex-1">
-                                {slots ? slots.map((slot, i) => (
-                                  <span key={i} className="whitespace-nowrap">
-                                    {slot}{i < slots.length - 1 ? ',' : ''}
+                                {slots ? slots.map((slotObj, i) => (
+                                  <span key={i} className={`whitespace-nowrap ${slotObj.isShared ? 'text-[#800000] font-black' : 'text-black'}`}>
+                                    {slotObj.text}{i < slots.length - 1 ? ',' : ''}
                                   </span>
                                 )) : <span>--</span>}
                               </div>
