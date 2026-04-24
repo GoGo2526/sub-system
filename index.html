@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>智能編代課系統v.3.1.4</title>
+  <title>智能編代課系統v3.2.2</title>
   
   <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -184,7 +184,7 @@
       ],
     };
 
-       const SCHEDULE_STRUCTURE = [
+        const SCHEDULE_STRUCTURE = [
       { type: 'class', id: 'HR', label: '班主任節', time: '8:15 - 8:35', csvKey: '班主任節' },
       { type: 'class', id: '1', label: '第一節', time: '8:35 - 9:10', csvKey: '1' },
       { type: 'class', id: '2', label: '第二節', time: '9:10 - 9:45', csvKey: '2' },
@@ -404,35 +404,26 @@
             const { occupancy, totalLessons } = meta;
             
             let prevCount = 0;
-            let hasPrev1Lesson = false;
-            let hasPrev2Lesson = false;
             for (let i = lessonIdx - 1; i >= 0; i--) {
               if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
-              prevCount++;
-              if (prevCount === 1) hasPrev1Lesson = occupancy[i];
-              if (prevCount === 2) {
-                hasPrev2Lesson = occupancy[i];
+              if (occupancy[i]) {
+                prevCount++;
+              } else {
                 break;
               }
             }
 
             let nextCount = 0;
-            let hasNext1Lesson = false;
-            let hasNext2Lesson = false;
             for (let i = lessonIdx + 1; i < occupancy.length; i++) {
               if (SCHEDULE_STRUCTURE[i].type === 'break') continue;
-              nextCount++;
-              if (nextCount === 1) hasNext1Lesson = occupancy[i];
-              if (nextCount === 2) {
-                hasNext2Lesson = occupancy[i];
+              if (occupancy[i]) {
+                nextCount++;
+              } else {
                 break;
               }
             }
 
-            const prevStatus = (hasPrev1Lesson && hasPrev2Lesson) ? 'X' : (hasPrev1Lesson ? 'R' : 'G');
-            const nextStatus = (hasNext1Lesson && hasNext2Lesson) ? 'X' : (hasNext1Lesson ? 'R' : 'G');
-
-            available.push({ id: t, total: totalLessons, prevStatus, nextStatus });
+            available.push({ id: t, total: totalLessons, prevCount, nextCount });
             seenNames.add(t);
           }
         });
@@ -1407,7 +1398,7 @@
                 <h1 className="text-3xl font-black text-slate-800 tracking-tight leading-none mb-2">觀塘官立小學(秀明道)</h1>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 overflow-hidden shrink w-full sm:w-auto">
-                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v.3.1.4</h2>
+                    <h2 className="text-[5vw] sm:text-xl font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis">智能編代課系統v3.2.2</h2>
                     <div className="flex flex-row items-center justify-between w-full sm:w-auto shrink-0">
                       <div className="flex gap-2 sm:gap-2">
                         <button onClick={() => window.location.href='https://gogo2526.github.io/sub-system/'} className="bg-[#800000] hover:bg-[#600000] text-white text-[3.8vw] sm:text-sm font-bold py-1.5 px-3 sm:px-3 rounded-lg shadow-sm transition-colors whitespace-nowrap">全日</button>
@@ -1595,19 +1586,15 @@
                                   <h4 className="text-4xl font-black flex items-center gap-4">選擇代課教師</h4>
                                   <div className="bg-blue-50 border-2 border-slate-500 rounded-2xl p-4 flex flex-col gap-1.5 w-fit shadow-sm">
                                     <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                      <span className="font-black text-black text-base leading-none w-2.5 text-center flex justify-center">X</span>
-                                      <span>X：代表該節「前兩課節」或「後兩課節」有課堂</span>
-                                    </div>
-                                    <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm"></span>
-                                      <span>紅點：代表該節「前一課節」或「後一課節」有課堂</span>
-                                    </div>
-                                    <div className="flex items-center gap-2.5 text-sm font-bold text-black">
-                                      <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block shadow-sm"></span>
+                                      <span className="w-4 flex justify-center"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block shadow-sm"></span></span>
                                       <span>綠點：代表該節「前一課節」或「後一課節」沒有課堂</span>
                                     </div>
+                                    <div className="flex items-center gap-2.5 text-sm font-bold text-black">
+                                      <span className="w-4 text-center font-black text-rose-600 text-lg leading-none">①</span>
+                                      <span>數字：代表該節「前一課節」或「後一課節」的連續課節節數</span>
+                                    </div>
                                     <div className="flex items-center gap-2.5 text-sm font-bold text-black mt-1">
-                                      <span className="w-2.5 text-center font-black">*</span>
+                                      <span className="w-4 text-center font-black">*</span>
                                       <span>教師代號旁的左、右符號表示課節前後的狀況</span>
                                     </div>
                                   </div>
@@ -1640,9 +1627,9 @@
                                   return (
                                     <button key={`${sub.id}-${sIdx}`} onClick={() => { handleAssignSub(idx, sub.id); setSubRequest(null); }} className={`${cardBgClass} p-6 rounded-2xl border-2 hover:shadow-xl transition-all flex flex-col items-center group relative overflow-hidden`}>
                                       <div className="flex items-center gap-2 mb-3">
-                                          {sub.prevStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="前兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.prevStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.prevStatus === 'R' ? '前一節有課' : '後一節無課'}></div>}
-                                          <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)}`}>{sub.id}</span>
-                                          {sub.nextStatus === 'X' ? <span className="text-black font-black text-xl leading-none select-none w-3 flex justify-center -mt-0.5" title="後兩節有課">X</span> : <div className={`w-3 h-3 rounded-full shadow-sm shrink-0 ${sub.nextStatus === 'R' ? 'bg-red-500' : 'bg-green-500'}`} title={sub.nextStatus === 'R' ? '後一節有課' : '後一節無課'}></div>}
+                                          {sub.prevCount === 0 ? <div className="w-3 h-3 rounded-full shadow-sm shrink-0 bg-green-500" title="前一節無課"></div> : <span className="text-rose-600 font-black text-[22px] leading-none select-none w-5 flex justify-center items-center -mt-0.5" title={`前有連續 ${sub.prevCount} 節課`}>{['⓪','①','②','③','④','⑤','⑥','⑦','⑧','⑨'][sub.prevCount] || sub.prevCount}</span>}
+                                          <span className={`${sub.id === 'Rachel' ? 'text-2xl' : 'text-4xl'} font-black ${getTeacherTextColor(sub.id)} px-1`}>{sub.id}</span>
+                                          {sub.nextCount === 0 ? <div className="w-3 h-3 rounded-full shadow-sm shrink-0 bg-green-500" title="後一節無課"></div> : <span className="text-rose-600 font-black text-[22px] leading-none select-none w-5 flex justify-center items-center -mt-0.5" title={`後有連續 ${sub.nextCount} 節課`}>{['⓪','①','②','③','④','⑤','⑥','⑦','⑧','⑨'][sub.nextCount] || sub.nextCount}</span>}
                                       </div>
                                       <span className="text-lg font-black text-slate-400 uppercase leading-none">總節數</span>
                                       <span className="text-3xl font-black text-slate-700">{sub.total}節</span>
