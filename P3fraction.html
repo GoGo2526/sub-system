@@ -306,11 +306,12 @@
                     while(dens.size < numCount) dens.add(Math.floor(Math.random() * 8) + (n + 1));
                     fracs = Array.from(dens).map(d => ({ n, d }));
                 } else {
-                    let used = new Set();
+                    let usedValues = new Set();
                     while(fracs.length < numCount) {
                         const d = Math.floor(Math.random() * 10) + 2; // 分母 2-11
                         const n = Math.floor(Math.random() * (d - 1)) + 1;
-                        if(!used.has(`${n}/${d}`)) { used.add(`${n}/${d}`); fracs.push({n, d}); }
+                        const val = n / d;
+                        if(!usedValues.has(val)) { usedValues.add(val); fracs.push({n, d}); }
                     }
                 }
                 result.push({ type, fractions: fracs, isAscending: Math.random() > 0.5 });
@@ -335,7 +336,13 @@
         }
 
         function startTimer() {
-            timeLeft = 60 + (totalLevelsCount * 2); // 根據題數稍微調整時間
+            if (totalLevelsCount < 10) {
+                timeLeft = 60;
+            } else if (totalLevelsCount <= 15) {
+                timeLeft = 80;
+            } else {
+                timeLeft = 100;
+            }
             document.getElementById('timer').innerText = timeLeft;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
