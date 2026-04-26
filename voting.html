@@ -15,6 +15,28 @@
   <!-- 引入 Babel (讓瀏覽器可直接解析 JSX 語法) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- 引入 Firebase 作為 ES Module 避免 Babel 轉譯問題 與 CSP 限制 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    window.FirebaseAPI = {
+      initializeApp,
+      getAuth,
+      signInAnonymously,
+      onAuthStateChanged,
+      signInWithCustomToken,
+      getFirestore,
+      doc,
+      onSnapshot,
+      setDoc
+    };
+    
+    // 通知 React 應用 Firebase 已載入完畢
+    window.dispatchEvent(new Event('firebase-loaded'));
+  </script>
+
   <style>
     /* 隱藏捲軸但保留滑動功能 */
     .scrollbar-hide::-webkit-scrollbar {
@@ -54,6 +76,7 @@
       // === Firebase 雲端狀態 ===
       const [user, setUser] = useState(null);
       const [db, setDb] = useState(null);
+      const [firebaseReady, setFirebaseReady] = useState(!!window.FirebaseAPI);
       const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
       const [systemState, setSystemState] = useState({
@@ -70,81 +93,84 @@
       const [setupError, setSetupError] = useState('');
       const [showConfirm, setShowConfirm] = useState(false);
 
-      // === 初始化 Firebase ===
+      // === 監聽 Firebase 模組載入 ===
       useEffect(() => {
-        let unsubscribeAuth;
-        let unsubscribeSnapshot;
+        if (!window.FirebaseAPI) {
+          const listener = () => setFirebaseReady(true);
+          window.addEventListener('firebase-loaded', listener);
+          return () => window.removeEventListener('firebase-loaded', listener);
+        }
+      }, []);
 
-        const initFirebase = async () => {
-          try {
-            // 使用 new Function 來防止 Babel 將動態 import 轉換為無法執行的 require
-            const dynamicImport = new Function('modulePath', 'return import(modulePath)');
-            
-            const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-            const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-            const { getFirestore, doc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+      // === 初始化 Firebase Auth ===
+      useEffect(() => {
+        if (!firebaseReady) return;
 
-            let config = {};
-            if (typeof __firebase_config !== 'undefined') {
-              config = JSON.parse(__firebase_config);
-            } else {
-              console.warn("未偵測到 Firebase Config，請在系統內運行。");
-              return;
-            }
+        const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, getFirestore } = window.FirebaseAPI;
 
-            if (!config.apiKey) return;
+        let config = {};
+        if (typeof __firebase_config !== 'undefined') {
+          config = JSON.parse(__firebase_config);
+        } else {
+          console.warn("未偵測到 Firebase Config，請在系統內運行。");
+          return;
+        }
 
-            const app = initializeApp(config);
-            const auth = getAuth(app);
-            const firestore = getFirestore(app);
-            setDb(firestore);
+        if (!config.apiKey) return;
 
-            const initAuth = async () => {
-              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-              } else {
-                await signInAnonymously(auth);
-              }
-            };
-            await initAuth();
+        const app = initializeApp(config);
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+        setDb(firestore);
 
-            unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-              setUser(currentUser);
-              if (currentUser) {
-                  const docRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'voting', 'mainState');
-                  unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-                      if (docSnap.exists()) {
-                          const data = docSnap.data();
-                          setSystemState(data);
-                          // 其他電腦連接時，自動跳轉到票站登入
-                          if (data.status !== 'setup' && !window.hasSwitchedInitialView && currentView === 'host') {
-                              setCurrentView('station_login');
-                              window.hasSwitchedInitialView = true;
-                          }
-                      }
-                  }, (error) => console.error("Firestore 同步錯誤:", error));
-              }
-            });
-          } catch (error) {
-              console.error("Firebase 初始化失敗:", error);
+        const initAuth = async () => {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
           }
         };
+        initAuth();
 
-        initFirebase();
+        const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+          setUser(currentUser);
+        });
 
-        return () => {
-          if (unsubscribeAuth) unsubscribeAuth();
-          if (unsubscribeSnapshot) unsubscribeSnapshot();
-        };
-      }, []);
+        return () => unsubscribeAuth();
+      }, [firebaseReady]);
+
+      // === 監聽 Firebase 資料庫變更 ===
+      useEffect(() => {
+        if (!user || !db || !window.FirebaseAPI) return;
+
+        const { doc, onSnapshot } = window.FirebaseAPI;
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'voting', 'mainState');
+        
+        const unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setSystemState(data);
+                
+                // 檢查此電腦是否為主機（由 localStorage 記錄）
+                const isHost = localStorage.getItem(`voting_host_${appId}`) === 'true';
+
+                // 其他電腦連接時，自動跳轉到票站登入
+                if (data.status !== 'setup' && !isHost && !window.hasSwitchedInitialView) {
+                    setCurrentView('station_login');
+                    window.hasSwitchedInitialView = true;
+                }
+            }
+        }, (error) => console.error("Firestore 同步錯誤:", error));
+
+        return () => unsubscribeSnapshot();
+      }, [user, db, appId]);
 
       // === 更新 Firebase 資料 ===
       const updateFirebase = async (newState) => {
           setSystemState(newState); // 樂觀 UI 更新
-          if (!user || !db) return;
+          if (!user || !db || !window.FirebaseAPI) return;
           try {
-              const dynamicImport = new Function('modulePath', 'return import(modulePath)');
-              const { doc, setDoc } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+              const { doc, setDoc } = window.FirebaseAPI;
               const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'voting', 'mainState');
               await setDoc(docRef, newState);
           } catch (error) {
@@ -205,6 +231,9 @@
           status: 'waiting',
           votes: {} // 本站獨立票數
         }));
+
+        // 標記此瀏覽器為主機
+        localStorage.setItem(`voting_host_${appId}`, 'true');
 
         await updateFirebase({
           status: 'ready',
