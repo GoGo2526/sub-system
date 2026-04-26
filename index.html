@@ -665,8 +665,7 @@
                const headerRow = dayData.find(row => row[0] && row[0].includes("教師代號"));
                const dataRow = dayData.find(row => row[0] && row[0].includes(slot.csvKey));
                
-               let matchedClasses = [];
-               let matchedTeachers = [];
+               let matchedPairs = [];
                
                if (headerRow && dataRow) {
                  for (let i = 1; i < dataRow.length; i++) {
@@ -675,17 +674,23 @@
                      const searchSubj = selectedClassView.replace("課", "");
                      if (cell.includes("/" + searchSubj)) {
                        const [cls] = cell.split("/");
-                       matchedClasses.push(cls);
-                       matchedTeachers.push(headerRow[i]);
+                       matchedPairs.push({ cls, teacher: headerRow[i] });
                      }
                    }
                  }
                }
                
-               if (matchedClasses.length > 0) {
-                 displayClass = matchedClasses.join(", ");
+               // 依照年級及班別順序進行排序 (例如: 1A, 1B, 2A)
+               matchedPairs.sort((a, b) => {
+                 if (a.cls < b.cls) return -1;
+                 if (a.cls > b.cls) return 1;
+                 return 0;
+               });
+               
+               if (matchedPairs.length > 0) {
+                 displayClass = matchedPairs.map(p => p.cls).join(", ");
                  displaySubject = selectedClassView;
-                 displayTeacher = matchedTeachers.join(", ");
+                 displayTeacher = matchedPairs.map(p => p.teacher).join(", ");
                }
             }
           } else {
@@ -695,9 +700,18 @@
              displayTeacher = classSlot.teacher || '--';
           }
 
+          let classColSizeClass = "whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis";
+          if (isSubjectView && displayClass.length > 16) {
+              classColSizeClass += " text-[6px] min-[375px]:text-[7px] sm:text-sm md:text-base lg:text-lg";
+          } else if (isSubjectView && displayClass.length > 12) {
+              classColSizeClass += " text-[7px] min-[375px]:text-[8px] sm:text-sm md:text-base lg:text-lg";
+          } else if (isSubjectView && displayClass.length > 8) {
+              classColSizeClass += " text-[8px] min-[375px]:text-[9px] sm:text-sm md:text-base lg:text-lg";
+          }
+
           return (
             <div key={idx} className={`grid grid-cols-[0.6fr_1.1fr_3.4fr_0.9fr_1fr] md:grid-cols-5 gap-1 sm:gap-2 md:gap-4 items-center text-center text-[10px] min-[375px]:text-[11px] sm:text-sm md:text-base lg:text-lg font-bold px-0.5 py-1 min-[375px]:px-1 min-[375px]:py-1.5 sm:p-2 md:p-4 rounded-xl md:rounded-2xl transition-all shadow-sm ${rowStyles}`}>
-              <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{displayClass}</div>
+              <div className={classColSizeClass}>{displayClass}</div>
               <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.label}</div>
               <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{slot.time}</div>
               <div className="whitespace-nowrap tracking-tighter sm:tracking-normal overflow-hidden text-ellipsis">{displaySubject}</div>
