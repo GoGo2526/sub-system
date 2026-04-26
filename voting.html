@@ -110,10 +110,25 @@
 
         let config = {};
         if (typeof __firebase_config !== 'undefined') {
+          // 在系統內執行時使用的預設環境變數
           config = JSON.parse(__firebase_config);
         } else {
-          console.warn("未偵測到 Firebase Config，請在系統內運行。");
-          return;
+          // ⚠️ 部署到 GitHub Pages 的外部設定區塊
+          // 請自行到 Firebase 建立專案並將設定貼在此處，才能在外部網站連線
+          config = {
+            apiKey: "請貼上您的_API_KEY",
+            authDomain: "請貼上您的_AUTH_DOMAIN",
+            projectId: "請貼上您的_PROJECT_ID",
+            storageBucket: "請貼上您的_STORAGE_BUCKET",
+            messagingSenderId: "請貼上您的_MESSAGING_SENDER_ID",
+            appId: "請貼上您的_APP_ID"
+          };
+          
+          if (config.apiKey.includes("請貼上")) {
+            console.warn("尚未設定外部 Firebase 憑證，部署至 GitHub Pages 後跨設備連線將無法運作！");
+            // 若為外部環境且未設定，直接 return 避免產生後續錯誤
+            return;
+          }
         }
 
         if (!config.apiKey) return;
@@ -495,8 +510,9 @@
                   <h2 className="text-2xl font-bold text-gray-800">實時投票數據</h2>
                 </div>
                 
-                {/* 橫向滑動區塊 */}
+                {/* 橫向滑動區塊與統計圖標題 */}
                 <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
+                  <h3 className="text-center text-xl font-bold text-gray-700 tracking-widest mb-4">各參選者得票統計圖</h3>
                   <div className="min-w-[600px] flex flex-col pl-20 md:pl-28 pr-4 mt-6 mb-4 h-full relative">
                     <div className="relative h-[420px] border-l-4 border-b-4 border-gray-500 flex bg-gray-50/30 rounded-tr-xl">
                       <div className="absolute top-1/2 -left-16 md:-left-20 -translate-y-1/2 -translate-x-1/2 -rotate-90 text-2xl font-black text-gray-700 tracking-widest whitespace-nowrap drop-shadow-sm">
