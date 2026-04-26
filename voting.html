@@ -14,6 +14,17 @@
   
   <!-- 引入 Babel (讓瀏覽器可直接解析 JSX 語法) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* 隱藏捲軸但保留滑動功能 */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 font-sans m-0 p-0">
   <div id="root"></div>
@@ -21,7 +32,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // === 重建 Lucide Icons (以 SVG 組件形式，確保無須 npm 安裝即可使用) ===
+    // === 重建 Lucide Icons ===
     const Icon = ({ d, children, className = "w-6 h-6", ...props }) => (
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
         {d ? <g dangerouslySetInnerHTML={{ __html: d }} /> : children}
@@ -40,124 +51,207 @@
     const AlertCircle = (p) => <Icon d='<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' {...p} />;
 
     const App = () => {
-      // === 全局系統狀態 (模擬後端資料庫) ===
+      // === Firebase 雲端狀態 ===
+      const [user, setUser] = useState(null);
+      const [db, setDb] = useState(null);
+      const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
       const [systemState, setSystemState] = useState({
-        status: 'setup', // 'setup' (設置中), 'ready' (準備就緒), 'active' (投票中), 'ended' (主機已結束)
+        status: 'setup', 
         title: '',
-        candidates: [], // { id, name, votes }
-        stations: [],   // { id, name, code, status: 'waiting', 'active', 'completed' }
+        candidates: [], 
+        stations: [],   
       });
 
-      // === 模擬環境的視角控制 ===
-      // 'host' 代表主機畫面, 'station_login' 代表票站登入畫面, 'station_X' 代表已登入的票站
       const [currentView, setCurrentView] = useState('host'); 
       const [activeStationId, setActiveStationId] = useState(null);
 
-      // === 輔助計算 ===
-      const totalVotes = useMemo(() => {
-        return systemState.candidates.reduce((sum, c) => sum + c.votes, 0);
-      }, [systemState.candidates]);
+      // 用於畫面操作的錯誤提示與確認狀態
+      const [setupError, setSetupError] = useState('');
+      const [showConfirm, setShowConfirm] = useState(false);
 
-      // 取代原有的 maxVotes，改為計算圖表坐標軸數據 (動態間距)
+      // === 初始化 Firebase ===
+      useEffect(() => {
+        let unsubscribeAuth;
+        let unsubscribeSnapshot;
+
+        const initFirebase = async () => {
+          try {
+            // 使用 new Function 來防止 Babel 將動態 import 轉換為無法執行的 require
+            const dynamicImport = new Function('modulePath', 'return import(modulePath)');
+            
+            const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+            const { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+            const { getFirestore, doc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+            let config = {};
+            if (typeof __firebase_config !== 'undefined') {
+              config = JSON.parse(__firebase_config);
+            } else {
+              console.warn("未偵測到 Firebase Config，請在系統內運行。");
+              return;
+            }
+
+            if (!config.apiKey) return;
+
+            const app = initializeApp(config);
+            const auth = getAuth(app);
+            const firestore = getFirestore(app);
+            setDb(firestore);
+
+            const initAuth = async () => {
+              if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+              } else {
+                await signInAnonymously(auth);
+              }
+            };
+            await initAuth();
+
+            unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+              setUser(currentUser);
+              if (currentUser) {
+                  const docRef = doc(firestore, 'artifacts', appId, 'public', 'data', 'voting', 'mainState');
+                  unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+                      if (docSnap.exists()) {
+                          const data = docSnap.data();
+                          setSystemState(data);
+                          // 其他電腦連接時，自動跳轉到票站登入
+                          if (data.status !== 'setup' && !window.hasSwitchedInitialView && currentView === 'host') {
+                              setCurrentView('station_login');
+                              window.hasSwitchedInitialView = true;
+                          }
+                      }
+                  }, (error) => console.error("Firestore 同步錯誤:", error));
+              }
+            });
+          } catch (error) {
+              console.error("Firebase 初始化失敗:", error);
+          }
+        };
+
+        initFirebase();
+
+        return () => {
+          if (unsubscribeAuth) unsubscribeAuth();
+          if (unsubscribeSnapshot) unsubscribeSnapshot();
+        };
+      }, []);
+
+      // === 更新 Firebase 資料 ===
+      const updateFirebase = async (newState) => {
+          setSystemState(newState); // 樂觀 UI 更新
+          if (!user || !db) return;
+          try {
+              const dynamicImport = new Function('modulePath', 'return import(modulePath)');
+              const { doc, setDoc } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+              const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'voting', 'mainState');
+              await setDoc(docRef, newState);
+          } catch (error) {
+              console.error("寫入 Firebase 失敗", error);
+          }
+      };
+
+      // === 輔助計算 ===
+      const totalVotes = useMemo(() => systemState.candidates.reduce((sum, c) => sum + c.votes, 0), [systemState.candidates]);
+
       const yAxisData = useMemo(() => {
-        const maxVotes = systemState.candidates.length > 0 
-          ? Math.max(...systemState.candidates.map(c => c.votes)) 
-          : 0;
-        
+        const maxVotes = systemState.candidates.length > 0 ? Math.max(...systemState.candidates.map(c => c.votes)) : 0;
         const targetMax = maxVotes > 0 ? maxVotes : 10;
-        
-        // 計算縱軸間距 (將縱軸大約分為 5 個刻度)
         let step = Math.ceil(targetMax / 5);
         if (step < 1) step = 1;
-        
-        // 讓間距變成整齊的數字 (例如 1, 2, 5, 10, 20 等)
         const magnitude = Math.pow(10, Math.floor(Math.log10(step)));
         const normalizedStep = step / magnitude;
-        
         let niceStep;
         if (normalizedStep <= 1) niceStep = 1 * magnitude;
         else if (normalizedStep <= 2) niceStep = 2 * magnitude;
         else if (normalizedStep <= 5) niceStep = 5 * magnitude;
         else niceStep = 10 * magnitude;
-
-        // 計算圖表頂部最大值
         const topValue = Math.ceil(targetMax / niceStep) * niceStep;
-        
         const ticks = [];
-        for (let i = 0; i <= topValue; i += niceStep) {
-          ticks.push(i);
-        }
-        
+        for (let i = 0; i <= topValue; i += niceStep) ticks.push(i);
         return { ticks, topValue, maxVotes };
       }, [systemState.candidates]);
 
       const allStationsCompleted = useMemo(() => {
         return systemState.stations.length > 0 && systemState.stations.every(s => s.status === 'completed');
       }, [systemState.stations]);
-
-      // 當所有票站完成時，若主機狀態還是 active，可以選擇自動或手動結束，這裡讓主機手動結束
       
       // === 主機功能：設置階段 ===
       const [setupData, setSetupData] = useState({
         title: '2026年度傑出員工選舉',
-        candidatesInput: '張三\n李四\n王五\n陳大文\n林小明', // 模擬 Excel 貼上
+        candidatesInput: '張三\n李四\n王五\n陳大文\n林小明',
         stationCount: 3
       });
 
-      const handleInitialize = () => {
-        // 處理參選人 (以換行符號分割，過濾空行)
+      const handleInitialize = async () => {
+        setSetupError('');
         const candidateNames = setupData.candidatesInput.split(/\r?\n/).map(n => n.trim()).filter(n => n !== '');
         
         if (candidateNames.length < 2 || candidateNames.length > 20) {
-          alert('請輸入 2 至 20 位參選者姓名！');
-          return;
+            setSetupError('請輸入 2 至 20 位參選者姓名！');
+            return;
         }
         if (!setupData.title.trim()) {
-          alert('請輸入投票標題！');
-          return;
+            setSetupError('請輸入投票標題！');
+            return;
         }
 
-        const newCandidates = candidateNames.map((name, index) => ({
-          id: `c_${index + 1}`,
-          name: name,
-          votes: 0
-        }));
-
+        const newCandidates = candidateNames.map((name, index) => ({ id: `c_${index + 1}`, name: name, votes: 0 }));
         const newStations = Array.from({ length: setupData.stationCount }).map((_, index) => ({
           id: `st_${index + 1}`,
           name: `票站 ${index + 1}`,
-          code: Math.floor(100000 + Math.random() * 900000).toString(), // 6位隨機認證碼
-          status: 'waiting'
+          code: Math.floor(100000 + Math.random() * 900000).toString(),
+          status: 'waiting',
+          votes: {} // 本站獨立票數
         }));
 
-        setSystemState({
+        await updateFirebase({
           status: 'ready',
           title: setupData.title,
           candidates: newCandidates,
           stations: newStations
         });
+        window.hasSwitchedInitialView = true; // 主機不會自動跳轉
       };
 
-      const handleStartVoting = () => {
-        setSystemState(prev => ({
-          ...prev,
+      const handleStartVoting = async () => {
+        await updateFirebase({
+          ...systemState,
           status: 'active',
-          stations: prev.stations.map(s => ({ ...s, status: 'active' }))
-        }));
+          // 只有等待中或已輸入代碼(standby)的票站進入 active
+          stations: systemState.stations.map(s => 
+            (s.status === 'waiting' || s.status === 'standby') ? { ...s, status: 'active' } : s
+          )
+        });
       };
 
-      const handleEndVoting = () => {
-        setSystemState(prev => ({ ...prev, status: 'ended' }));
+      const handleEndVoting = async () => {
+        await updateFirebase({ ...systemState, status: 'ended' });
       };
 
       // === 票站功能 ===
       const [loginCode, setLoginCode] = useState('');
       const [loginError, setLoginError] = useState('');
 
-      const handleStationLogin = (e) => {
+      const handleStationLogin = async (e) => {
         e.preventDefault();
         const station = systemState.stations.find(s => s.code === loginCode);
         if (station) {
+          // 更新狀態：waiting -> standby (準備中)
+          let newStationStatus = station.status;
+          if (systemState.status === 'ready' && station.status === 'waiting') {
+              newStationStatus = 'standby';
+          } else if (systemState.status === 'active' && (station.status === 'waiting' || station.status === 'standby')) {
+              newStationStatus = 'active';
+          }
+
+          const newStations = systemState.stations.map(s => 
+              s.id === station.id ? { ...s, status: newStationStatus } : s
+          );
+          
+          await updateFirebase({ ...systemState, stations: newStations });
+          
           setCurrentView(`station_${station.id}`);
           setActiveStationId(station.id);
           setLoginError('');
@@ -167,35 +261,63 @@
         }
       };
 
-      const handleVote = (candidateId) => {
+      const handleVote = async (candidateId) => {
         if (systemState.status !== 'active') return;
-        
         const station = systemState.stations.find(s => s.id === activeStationId);
-        if (!station || station.status === 'completed') return;
+        if (!station || station.status !== 'active') return;
 
-        setSystemState(prev => ({
-          ...prev,
-          candidates: prev.candidates.map(c => 
-            c.id === candidateId ? { ...c, votes: c.votes + 1 } : c
-          )
-        }));
+        const newCandidates = systemState.candidates.map(c => 
+          c.id === candidateId ? { ...c, votes: c.votes + 1 } : c
+        );
+
+        const newStations = systemState.stations.map(s => {
+            if (s.id === activeStationId) {
+                return {
+                    ...s,
+                    votes: {
+                        ...(s.votes || {}),
+                        [candidateId]: ((s.votes || {})[candidateId] || 0) + 1
+                    }
+                };
+            }
+            return s;
+        });
+
+        await updateFirebase({
+            ...systemState,
+            candidates: newCandidates,
+            stations: newStations
+        });
       };
 
-      const handleStationComplete = () => {
+      const handleStationComplete = async () => {
         if (!activeStationId) return;
-        if (!window.confirm('確定完成點票？完成後將無法再輸入票數。')) return;
 
-        setSystemState(prev => ({
-          ...prev,
-          stations: prev.stations.map(s => 
+        await updateFirebase({
+          ...systemState,
+          stations: systemState.stations.map(s => 
             s.id === activeStationId ? { ...s, status: 'completed' } : s
           )
-        }));
+        });
+      };
+
+      // 取得上方導覽列按鈕顏色的函數 (符合設定要求)
+      const getStationBtnClass = (status, isActive) => {
+          let base = "px-4 py-1.5 rounded text-sm font-medium transition-colors border whitespace-nowrap flex-shrink-0 ";
+          if (isActive) base += "ring-2 ring-white border-white ";
+          else base += "border-transparent ";
+          
+          switch(status) {
+              case 'waiting': return base + "bg-[#800000] text-white"; // 棗紅色
+              case 'standby': return base + "bg-[#b8860b] text-white"; // 深黃色
+              case 'active': return base + "bg-teal-600 text-white";
+              case 'completed': return base + "bg-blue-600 text-white";
+              default: return base + "bg-gray-800 text-gray-300";
+          }
       };
 
       // === 渲染組件 ===
 
-      // 1. 主機：設置畫面 (優化版面)
       const renderSetup = () => (
         <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-blue-600 p-6 text-white flex items-center gap-3">
@@ -204,7 +326,6 @@
           </div>
           <div className="p-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              {/* 左欄：基本資料與票站 */}
               <div className="space-y-6">
                 <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm transition-all hover:shadow-md">
                   <label className="flex items-center gap-2 text-lg font-bold text-blue-900 mb-3">
@@ -238,7 +359,6 @@
                 </div>
               </div>
 
-              {/* 右欄：參選人名單 */}
               <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 shadow-sm flex flex-col h-full transition-all hover:shadow-md">
                 <label className="flex items-center justify-between text-lg font-bold text-blue-900 mb-3">
                   <div className="flex items-center gap-2">
@@ -263,6 +383,13 @@
               </div>
             </div>
 
+            {setupError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl font-bold flex items-center gap-2 shadow-sm">
+                <AlertCircle className="w-5 h-5" />
+                {setupError}
+              </div>
+            )}
+
             <button 
               onClick={handleInitialize}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 text-xl"
@@ -274,22 +401,15 @@
         </div>
       );
 
-      // 2. 主機：控制面板 (直向棒形圖 & 滿版佈局)
       const renderHostDashboard = () => {
-        // 預先計算額外的參考數據 (前三名)
         const sortedCandidates = [...systemState.candidates].sort((a, b) => b.votes - a.votes);
         const top3 = sortedCandidates.slice(0, 3);
         const rankTitles = ["最高得票數", "第二得票數", "第三得票數"];
-        const rankColors = [
-          "border-yellow-400 bg-gradient-to-r from-yellow-100 to-yellow-50", 
-          "border-gray-400 bg-gradient-to-r from-gray-200 to-gray-50", 
-          "border-orange-400 bg-gradient-to-r from-orange-200 to-orange-50"
-        ];
+        const rankColors = ["border-yellow-400 bg-gradient-to-r from-yellow-100 to-yellow-50", "border-gray-400 bg-gradient-to-r from-gray-200 to-gray-50", "border-orange-400 bg-gradient-to-r from-orange-200 to-orange-50"];
         const rankTextColors = ["text-yellow-700", "text-gray-700", "text-orange-800"];
 
         return (
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* 頭部資訊列 */}
             <div className="bg-white rounded-2xl shadow-sm p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-l-8 border-blue-600">
               <div>
                 <h1 className="text-3xl font-black text-gray-800 tracking-tight">{systemState.title}</h1>
@@ -327,96 +447,89 @@
               </div>
             </div>
 
-            {/* 內容佈局：左側圖表 (佔 3/4)，右側統計 (佔 1/4) */}
+            {/* 新增準備中訊息 */}
+            {systemState.status === 'ready' && (
+              <div className="w-full bg-blue-100 border-l-4 border-blue-500 text-blue-800 p-4 rounded-r-lg font-bold text-xl flex flex-col md:flex-row md:items-center gap-3">
+                 <Monitor className="w-6 h-6 shrink-0" />
+                 <span>投票工作預備中！請將下方的「認證碼」派發給各票站登入。</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               
-              {/* 左側：實時直向棒形圖 */}
-              <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm p-6 flex flex-col h-full">
-                <div className="flex items-center gap-3 mb-8 border-b pb-4">
+              {/* 圖表區 (加上手機滑動效果 overflow-x-auto) */}
+              <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm p-6 flex flex-col h-full overflow-hidden">
+                <div className="flex items-center gap-3 mb-8 border-b pb-4 shrink-0">
                   <div className="p-2 bg-blue-100 rounded-lg">
                      <BarChart3 className="w-6 h-6 text-blue-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-800">實時投票數據</h2>
                 </div>
                 
-                <div className="w-full flex flex-col pl-20 md:pl-28 pr-4 mt-6 mb-4 flex-grow justify-end">
-                  
-                  {/* 圖表坐標軸區域 */}
-                  <div className="relative h-[420px] border-l-4 border-b-4 border-gray-500 flex bg-gray-50/30 rounded-tr-xl">
-                    {/* 縱軸名稱 (移至左側中間並旋轉) */}
-                    <div className="absolute top-1/2 -left-16 md:-left-20 -translate-y-1/2 -translate-x-1/2 -rotate-90 text-2xl font-black text-gray-700 tracking-widest whitespace-nowrap drop-shadow-sm">
-                      人數 (人)
-                    </div>
-
-                    {/* 橫線與縱軸數字 */}
-                    {yAxisData.ticks.map(tick => {
-                       const bottomPercent = yAxisData.topValue > 0 ? (tick / yAxisData.topValue) * 100 : 0;
-                       return (
-                         <div key={tick} className="absolute w-full border-t-2 border-dashed border-gray-200 z-0" style={{ bottom: `${bottomPercent}%` }}>
-                           {/* 加大並粗體的縱軸數字 */}
-                           <span className="absolute -left-4 -translate-x-full -translate-y-1/2 text-xl md:text-2xl text-gray-800 font-black drop-shadow-sm">
-                             {tick}
-                           </span>
-                         </div>
-                       );
-                    })}
-
-                    {/* 棒形圖與參選人 */}
-                    <div className="relative z-10 w-full h-full flex items-end justify-around px-2 md:px-6">
-                      {systemState.candidates.map(candidate => {
-                        const percentage = yAxisData.topValue > 0 ? (candidate.votes / yAxisData.topValue) * 100 : 0;
-                        let barColor = "bg-gradient-to-t from-blue-600 to-blue-400";
-                        let textColor = "text-gray-800";
-                        let highlightClass = "border border-blue-700 border-b-0";
-                        
-                        if (systemState.status === 'ended' && candidate.votes === yAxisData.maxVotes && yAxisData.maxVotes > 0) {
-                          barColor = "bg-gradient-to-t from-yellow-500 to-yellow-300";
-                          textColor = "text-yellow-600";
-                          highlightClass = "ring-4 ring-yellow-400 ring-offset-2 border-none";
-                        }
-
-                        return (
-                          <div key={candidate.id} className="relative h-full flex flex-col justify-end items-center w-full max-w-[90px] group mx-2">
-                            {/* 直向棒狀圖本體 */}
-                            <div 
-                              style={{ height: `${percentage}%`, minHeight: candidate.votes > 0 ? '6px' : '0px' }} 
-                              className={`w-full relative rounded-t-lg transition-all duration-[800ms] ease-out shadow-lg group-hover:brightness-110 ${barColor} ${highlightClass}`}
-                            >
-                              {/* 顯示在棒上端的加大數字 */}
-                              <div className={`absolute -top-12 left-1/2 -translate-x-1/2 text-3xl md:text-4xl font-black transition-all duration-300 group-hover:-translate-y-2 drop-shadow-md ${textColor}`}>
-                                {candidate.votes}
-                              </div>
-                            </div>
-                            {/* 背景空槽效果 */}
-                            <div className="absolute inset-x-0 bottom-0 top-0 bg-gray-100/50 -z-10 rounded-t-lg border-x border-t border-gray-200"></div>
-                          </div>
-                        );
+                {/* 橫向滑動區塊 */}
+                <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
+                  <div className="min-w-[600px] flex flex-col pl-20 md:pl-28 pr-4 mt-6 mb-4 h-full relative">
+                    <div className="relative h-[420px] border-l-4 border-b-4 border-gray-500 flex bg-gray-50/30 rounded-tr-xl">
+                      <div className="absolute top-1/2 -left-16 md:-left-20 -translate-y-1/2 -translate-x-1/2 -rotate-90 text-2xl font-black text-gray-700 tracking-widest whitespace-nowrap drop-shadow-sm">
+                        人數 (人)
+                      </div>
+                      {yAxisData.ticks.map(tick => {
+                         const bottomPercent = yAxisData.topValue > 0 ? (tick / yAxisData.topValue) * 100 : 0;
+                         return (
+                           <div key={tick} className="absolute w-full border-t-2 border-dashed border-gray-200 z-0" style={{ bottom: `${bottomPercent}%` }}>
+                             <span className="absolute -left-4 -translate-x-full -translate-y-1/2 text-xl md:text-2xl text-gray-800 font-black drop-shadow-sm">
+                               {tick}
+                             </span>
+                           </div>
+                         );
                       })}
+                      <div className="relative z-10 w-full h-full flex items-end justify-around px-2 md:px-6">
+                        {systemState.candidates.map(candidate => {
+                          const percentage = yAxisData.topValue > 0 ? (candidate.votes / yAxisData.topValue) * 100 : 0;
+                          let barColor = "bg-gradient-to-t from-blue-600 to-blue-400";
+                          let textColor = "text-gray-800";
+                          let highlightClass = "border border-blue-700 border-b-0";
+                          
+                          if (systemState.status === 'ended' && candidate.votes === yAxisData.maxVotes && yAxisData.maxVotes > 0) {
+                            barColor = "bg-gradient-to-t from-yellow-500 to-yellow-300";
+                            textColor = "text-yellow-600";
+                            highlightClass = "ring-4 ring-yellow-400 ring-offset-2 border-none";
+                          }
+
+                          return (
+                            <div key={candidate.id} className="relative h-full flex flex-col justify-end items-center w-full max-w-[90px] group mx-2">
+                              <div 
+                                style={{ height: `${percentage}%`, minHeight: candidate.votes > 0 ? '6px' : '0px' }} 
+                                className={`w-full relative rounded-t-lg transition-all duration-[800ms] ease-out shadow-lg group-hover:brightness-110 ${barColor} ${highlightClass}`}
+                              >
+                                <div className={`absolute -top-12 left-1/2 -translate-x-1/2 text-3xl md:text-4xl font-black transition-all duration-300 group-hover:-translate-y-2 drop-shadow-md ${textColor}`}>
+                                  {candidate.votes}
+                                </div>
+                              </div>
+                              <div className="absolute inset-x-0 bottom-0 top-0 bg-gray-100/50 -z-10 rounded-t-lg border-x border-t border-gray-200"></div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* 橫軸：參選人姓名標籤 (加大粗體) */}
-                  <div className="w-full flex items-start justify-around px-2 md:px-6 pt-6">
-                     {systemState.candidates.map(candidate => (
-                       <div key={candidate.id} className="w-full max-w-[90px] mx-2 text-center text-lg md:text-xl font-black text-gray-800 break-words leading-tight drop-shadow-sm">
-                         {candidate.name}
-                       </div>
-                     ))}
-                  </div>
-
-                  {/* 橫軸標題 (加大粗體) */}
-                  <div className="w-full text-center text-gray-700 font-black text-xl md:text-2xl mt-8 tracking-widest flex items-center justify-center gap-4">
-                    <div className="h-1 bg-gray-400 flex-grow max-w-[80px] rounded-full"></div>
-                    參選者姓名
-                    <div className="h-1 bg-gray-400 flex-grow max-w-[80px] rounded-full"></div>
+                    <div className="w-full flex items-start justify-around px-2 md:px-6 pt-6">
+                       {systemState.candidates.map(candidate => (
+                         <div key={candidate.id} className="w-full max-w-[90px] mx-2 text-center text-lg md:text-xl font-black text-gray-800 break-words leading-tight drop-shadow-sm">
+                           {candidate.name}
+                         </div>
+                       ))}
+                    </div>
+                    <div className="w-full text-center text-gray-700 font-black text-xl md:text-2xl mt-8 tracking-widest flex items-center justify-center gap-4">
+                      <div className="h-1 bg-gray-400 flex-grow max-w-[80px] rounded-full"></div>
+                      參選者姓名
+                      <div className="h-1 bg-gray-400 flex-grow max-w-[80px] rounded-full"></div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* 右側：數據統計區塊 */}
+              {/* 右側：數據統計 */}
               <div className="lg:col-span-1 flex flex-col gap-6">
-                
-                {/* 總票數區塊 */}
                 <div className="bg-white rounded-2xl shadow-sm p-6 border-t-4 border-blue-500 flex-grow flex flex-col justify-center">
                   <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <BarChart3 className="w-6 h-6 text-blue-500"/> 數據統計
@@ -430,20 +543,15 @@
                     </p>
                   </div>
                 </div>
-
-                {/* 可參考數據區塊 */}
                 <div className="bg-white rounded-2xl shadow-sm p-6 border-t-4 border-teal-500">
                   <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-teal-500"/> 可參考數據
                   </h2>
-                  
-                  {/* 加入完美對齊的表頭 */}
                   <div className="grid grid-cols-12 gap-2 px-3 pb-2 border-b-2 border-gray-100 mb-3 text-sm font-bold text-gray-500">
                     <div className="col-span-4 text-left">排名狀況</div>
                     <div className="col-span-5 text-center">參選者姓名</div>
                     <div className="col-span-3 text-right">票數</div>
                   </div>
-                  
                   <div className="space-y-3">
                     {top3.map((candidate, index) => (
                       <div key={index} className={`rounded-xl p-3 border-l-4 shadow-sm grid grid-cols-12 gap-2 items-center transition-all ${rankColors[index] || 'border-gray-200 bg-gray-50'}`}>
@@ -460,25 +568,15 @@
                     ))}
                   </div>
                 </div>
-
               </div>
             </div>
 
-            {/* 下方：各票站狀態 (滿版佈局) */}
             <div className="bg-white rounded-2xl shadow-sm p-6 w-full">
                <div className="flex items-center justify-between border-b pb-4 mb-6">
                  <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
                     <Users className="w-6 h-6 text-blue-500" /> 各票站連線狀態
                  </h2>
                </div>
-               
-               {systemState.status === 'ready' && (
-                  <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg text-lg font-medium flex items-center gap-3 shadow-sm">
-                    <AlertCircle className="w-7 h-7 shrink-0"/>
-                    <div>請將下方的「<strong className="font-mono text-xl mx-1 bg-white px-2 py-1 rounded">認證碼</strong>」派發給各票站工作人員進行系統登入。</div>
-                  </div>
-               )}
-
                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                  {systemState.stations.map(station => (
                    <div key={station.id} className="flex flex-col p-5 border-2 border-gray-100 rounded-xl bg-gray-50/50 hover:bg-white hover:border-blue-300 hover:shadow-lg transition-all duration-300">
@@ -487,8 +585,9 @@
                          <Monitor className="w-5 h-5 text-gray-400"/>
                          {station.name}
                        </span>
-                       {station.status === 'waiting' && <span className="text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded-full font-bold">等待開始</span>}
-                       {station.status === 'active' && <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full font-black animate-pulse">點票中</span>}
+                       {station.status === 'waiting' && <span className="text-sm bg-[#800000] text-white px-3 py-1 rounded-full font-bold shadow-sm">等待開始</span>}
+                       {station.status === 'standby' && <span className="text-sm bg-[#b8860b] text-white px-3 py-1 rounded-full font-bold shadow-sm">準備中</span>}
+                       {station.status === 'active' && <span className="text-sm bg-teal-100 text-teal-700 px-3 py-1 rounded-full font-black animate-pulse">點票中</span>}
                        {station.status === 'completed' && <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-black flex items-center gap-1"><CheckCircle className="w-4 h-4"/> 已完成</span>}
                      </div>
                      <div className="flex justify-between items-center text-sm bg-white p-3 rounded-lg border border-gray-200 shadow-inner">
@@ -505,7 +604,6 @@
         );
       };
 
-      // 3. 票站：未登入畫面
       const renderStationLogin = () => (
         <div className="max-w-md mx-auto mt-20 bg-white rounded-xl shadow-lg p-8">
           <div className="text-center mb-8">
@@ -513,7 +611,14 @@
               <LogIn className="w-8 h-8 text-teal-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-800">票站系統登入</h2>
-            <p className="text-gray-500 mt-2">請輸入由主機提供的網站認證號碼</p>
+            {/* 只顯示當前的準備投票名稱及相關訊息 */}
+            {systemState.title && <p className="text-xl font-black text-teal-700 mt-2">{systemState.title}</p>}
+            {systemState.status === 'ready' && (
+              <div className="mt-4 py-2 px-4 bg-blue-100 text-blue-800 rounded-lg font-bold animate-pulse inline-block">
+                投票工作預備中
+              </div>
+            )}
+            <p className="text-gray-500 mt-4">請輸入由主機提供的網站認證號碼</p>
           </div>
 
           <form onSubmit={handleStationLogin} className="space-y-6">
@@ -539,7 +644,6 @@
         </div>
       );
 
-      // 4. 票站：操作畫面
       const renderStationView = () => {
         const station = systemState.stations.find(s => s.id === activeStationId);
         if (!station) return renderStationLogin();
@@ -572,10 +676,18 @@
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold text-gray-800">請輸入得票</h2>
                       <button 
-                        onClick={handleStationComplete}
-                        className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-full font-bold shadow transition-colors flex items-center gap-2"
+                        onClick={() => {
+                            if (!showConfirm) {
+                                setShowConfirm(true);
+                                setTimeout(() => setShowConfirm(false), 3000); // 3秒後取消確認狀態
+                            } else {
+                                handleStationComplete();
+                                setShowConfirm(false);
+                            }
+                        }}
+                        className={`px-6 py-2 rounded-full font-bold shadow transition-colors flex items-center gap-2 ${showConfirm ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
                       >
-                        <CheckCircle className="w-5 h-5"/> 票站點票完成
+                        <CheckCircle className="w-5 h-5"/> {showConfirm ? '點擊確認完成' : '票站點票完成'}
                       </button>
                     </div>
 
@@ -601,7 +713,7 @@
                        <BarChart3 className="w-5 h-5 text-teal-600" />
                        本票站實時資料
                      </h3>
-                     <div className="space-y-3 overflow-y-auto flex-grow pr-2">
+                     <div className="space-y-3 overflow-y-auto flex-grow pr-2 scrollbar-hide">
                        {systemState.candidates.map(c => {
                          const stVotes = station.votes ? (station.votes[c.id] || 0) : 0;
                          return (
@@ -616,11 +728,24 @@
                 </div>
               )}
 
+              {/* 點票完成後：隱藏輸入區，只顯示本站得票結果 */}
               {(station.status === 'completed' || systemState.status === 'ended') && (
-                <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                  <CheckCircle className="w-20 h-20 text-green-500 mb-4" />
-                  <h2 className="text-3xl font-bold text-gray-800">本票站作業已完成</h2>
-                  <p className="text-gray-500 mt-2 text-lg">數據已鎖定並成功傳送至主機。</p>
+                <div className="flex flex-col items-center justify-center py-12 w-full">
+                   <CheckCircle className="w-20 h-20 text-green-500 mb-6" />
+                   <h2 className="text-3xl font-black text-gray-800 mb-2">本票站點票已完成</h2>
+                   <p className="text-gray-500 text-lg mb-8">以下為本站的最終得票結果：</p>
+                   
+                   <div className="w-full max-w-2xl bg-gray-50 rounded-2xl border border-gray-200 p-8 shadow-inner">
+                     {systemState.candidates.map(c => {
+                       const stVotes = station.votes ? (station.votes[c.id] || 0) : 0;
+                       return (
+                         <div key={c.id} className="flex justify-between items-center bg-white p-4 mb-3 rounded-xl shadow-sm border border-gray-100">
+                           <span className="font-bold text-gray-800 text-xl">{c.name}</span>
+                           <span className="font-black text-teal-700 bg-teal-50 px-4 py-2 rounded-lg text-2xl shrink-0">{stVotes} 票</span>
+                         </div>
+                       );
+                     })}
+                   </div>
                 </div>
               )}
             </div>
@@ -628,17 +753,15 @@
         );
       };
 
-
-      // === 主渲染結構 ===
       return (
         <div className="min-h-screen">
-          {/* 頂部模擬器控制列 (僅供測試體驗使用) */}
-          <div className="bg-gray-900 text-gray-300 py-2 px-4 flex flex-wrap items-center justify-between sticky top-0 z-50">
-            <div className="flex items-center gap-2 text-sm font-semibold">
+          {/* 頂部模擬器控制列 (支援手機橫向滑動) */}
+          <div className="bg-gray-900 text-gray-300 py-3 px-4 flex flex-nowrap items-center gap-4 sticky top-0 z-50 overflow-x-auto whitespace-nowrap scrollbar-hide">
+            <div className="flex items-center gap-2 text-sm font-semibold shrink-0">
               <AlertCircle className="w-4 h-4 text-yellow-500" />
               多設備模擬視角切換器：
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               <button 
                 onClick={() => setCurrentView('host')}
                 className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${currentView === 'host' ? 'bg-blue-600 text-white' : 'bg-gray-800 hover:bg-gray-700'}`}
@@ -660,7 +783,7 @@
                     setCurrentView(`station_${st.id}`);
                     setActiveStationId(st.id);
                   }}
-                  className={`px-4 py-1.5 rounded text-sm font-medium transition-colors border ${currentView === `station_${st.id}` ? 'bg-teal-600 text-white border-teal-500' : 'bg-gray-800 hover:bg-gray-700 border-gray-600'}`}
+                  className={getStationBtnClass(st.status, currentView === `station_${st.id}`)}
                 >
                   {st.name} ({st.status})
                 </button>
@@ -668,21 +791,17 @@
             </div>
           </div>
 
-          {/* 主內容區 */}
           <div className="p-6">
             {currentView === 'host' && (
               systemState.status === 'setup' ? renderSetup() : renderHostDashboard()
             )}
-            
             {currentView === 'station_login' && renderStationLogin()}
-            
             {currentView.startsWith('station_') && currentView !== 'station_login' && renderStationView()}
           </div>
         </div>
       );
     };
 
-    // 掛載 React 應用程式到頁面
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
